@@ -67,6 +67,11 @@ _EXTENSION_PREFIX = 'anthropic.claude-code-'
 CHANGELOG_URL = 'https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md'
 PROJECT_URL = 'https://github.com/AlphaBrock/CCMonitor'
 RELEASES_API_URL = 'https://api.github.com/repos/AlphaBrock/CCMonitor/releases/latest'
+RELEASE_ASSET_NAME = 'UsageMonitorForClaude.exe'
+RELEASE_API_HEADERS = {
+    'Accept': 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+}
 
 __all__ = [
     'CLAUDE_CLI_PATH', 'CHANGELOG_URL', 'PROJECT_URL', 'RELEASES_API_URL',
@@ -244,20 +249,24 @@ def check_latest_version(current_version: str) -> LatestRelease:
     -------
     LatestRelease
         Whether a newer version is available, the latest version string,
-        the release page URL, and any error message.
+        the public download URL, and any error message.
     """
     try:
-        response = requests.get(RELEASES_API_URL, timeout=10)
+        response = requests.get(RELEASES_API_URL, headers=RELEASE_API_HEADERS, timeout=10)
         response.raise_for_status()
         data = response.json()
     except Exception as exc:
         return LatestRelease(available=False, version='', url='', error=str(exc)[:200])
+    if not isinstance(data, dict):
+        return LatestRelease(available=False, version='', url='', error='Invalid release response')
 
     tag = data.get('tag_name', '').lstrip('v')
-    release_url = data.get('html_url', '')
+    release_url = _pick_release_download_url(data)
 
     if not tag:
         return LatestRelease(available=False, version='', url='', error='No tag in response')
+    if not release_url:
+        return LatestRelease(available=False, version='', url='', error='No release URL in response')
 
     try:
         latest_parts = tuple(int(x) for x in tag.split('.'))
@@ -267,3 +276,36 @@ def check_latest_version(current_version: str) -> LatestRelease:
         newer = tag != current_version
 
     return LatestRelease(available=newer, version=tag, url=release_url, error='')
+
+
+def _pick_release_download_url(release_data: dict) -> str:
+    """Pick the most appropriate public download URL from a release payload."""
+    assets = release_data.get('assets')
+    if isinstance(assets, list):
+        first_asset_url = ''
+        exe_asset_url = ''
+        for asset in assets:
+            if not isinstance(asset, dict):
+                continue
+
+            asset_name = asset.get('name')
+            asset_url = asset.get('browser_download_url')
+            if not isinstance(asset_name, str) or not isinstance(asset_url, str) or not asset_url:
+                continue
+
+            if not first_asset_url:
+                first_asset_url = asset_url
+
+            if asset_name == RELEASE_ASSET_NAME:
+                return asset_url
+
+            if not exe_asset_url and asset_name.lower().endswith('.exe'):
+                exe_asset_url = asset_url
+
+        if exe_asset_url:
+            return exe_asset_url
+        if first_asset_url:
+            return first_asset_url
+
+    release_page_url = release_data.get('html_url')
+    return release_page_url if isinstance(release_page_url, str) else ''

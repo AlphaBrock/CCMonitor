@@ -3,7 +3,7 @@ Claude CLI Tests
 ==================
 
 Unit tests for _discover_cli_path(), find_installations(), refresh_token(),
-and cli_version().
+cli_version(), and check_latest_version().
 """
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from src.integrations import claude_cli
 from src.integrations.claude_cli import (
     ClaudeInstallation,
     RefreshResult,
+    check_latest_version,
     cli_version,
     find_installations,
     refresh_token,
@@ -300,6 +301,135 @@ class TestFindInstallations(unittest.TestCase):
         self.assertEqual(len(result), 2)
         self.assertEqual(result[0].name, 'CLI')
         self.assertEqual(result[1].name, 'VS Code')
+
+
+# ---------------------------------------------------------------------------
+# check_latest_version
+# ---------------------------------------------------------------------------
+
+class TestCheckLatestVersion(unittest.TestCase):
+    """Tests for check_latest_version()."""
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_prefers_named_exe_asset_url(self, mock_get):
+        """Returns the packaged EXE download URL when it exists."""
+        mock_get.return_value = MagicMock(
+            json=MagicMock(return_value={
+                'tag_name': 'v1.16.0',
+                'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0',
+                'assets': [
+                    {
+                        'name': 'UsageMonitorForClaude.exe',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/UsageMonitorForClaude.exe',
+                    },
+                    {
+                        'name': 'checksums.txt',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/checksums.txt',
+                    },
+                ],
+            }),
+        )
+
+        result = check_latest_version('1.15.5')
+
+        self.assertTrue(result.available)
+        self.assertEqual(result.version, '1.16.0')
+        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/UsageMonitorForClaude.exe')
+        mock_get.assert_called_once_with(
+            claude_cli.RELEASES_API_URL,
+            headers=claude_cli.RELEASE_API_HEADERS,
+            timeout=10,
+        )
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_falls_back_to_first_exe_asset(self, mock_get):
+        """Returns another EXE asset when the preferred filename is absent."""
+        mock_get.return_value = MagicMock(
+            json=MagicMock(return_value={
+                'tag_name': 'v1.16.0',
+                'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0',
+                'assets': [
+                    {
+                        'name': 'CCMonitor-Portable.exe',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/CCMonitor-Portable.exe',
+                    },
+                    {
+                        'name': 'checksums.txt',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/checksums.txt',
+                    },
+                ],
+            }),
+        )
+
+        result = check_latest_version('1.15.5')
+
+        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/CCMonitor-Portable.exe')
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_falls_back_to_first_asset_when_no_exe_exists(self, mock_get):
+        """Returns the first asset URL when the release has no EXE asset."""
+        mock_get.return_value = MagicMock(
+            json=MagicMock(return_value={
+                'tag_name': 'v1.16.0',
+                'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0',
+                'assets': [
+                    {
+                        'name': 'checksums.txt',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/checksums.txt',
+                    },
+                ],
+            }),
+        )
+
+        result = check_latest_version('1.15.5')
+
+        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/checksums.txt')
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_falls_back_to_release_page_when_no_assets_exist(self, mock_get):
+        """Returns the release page URL when no assets are attached."""
+        mock_get.return_value = MagicMock(
+            json=MagicMock(return_value={
+                'tag_name': 'v1.16.0',
+                'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0',
+                'assets': [],
+            }),
+        )
+
+        result = check_latest_version('1.15.5')
+
+        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0')
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_returns_not_available_for_same_version(self, mock_get):
+        """Same version returns available=False while keeping the download URL."""
+        mock_get.return_value = MagicMock(
+            json=MagicMock(return_value={
+                'tag_name': 'v1.15.5',
+                'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.15.5',
+                'assets': [
+                    {
+                        'name': 'UsageMonitorForClaude.exe',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.15.5/UsageMonitorForClaude.exe',
+                    },
+                ],
+            }),
+        )
+
+        result = check_latest_version('1.15.5')
+
+        self.assertFalse(result.available)
+        self.assertEqual(result.version, '1.15.5')
+
+    @patch('src.integrations.claude_cli.requests.get')
+    def test_invalid_release_payload_returns_error(self, mock_get):
+        """Non-dict API payload returns a readable error."""
+        mock_get.return_value = MagicMock(json=MagicMock(return_value=[]))
+
+        result = check_latest_version('1.15.5')
+
+        self.assertFalse(result.available)
+        self.assertEqual(result.error, 'Invalid release response')
 
 
 # ---------------------------------------------------------------------------

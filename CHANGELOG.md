@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.6] - 2026-05-22
+
+### Fixed
+
+- "Check for Updates" now opens the latest Windows EXE package from the newest GitHub Release instead of only opening the release page
+
+---
+
+### 修复
+
+- 「检查更新」现在会直接打开 GitHub 最新 Release 中的 Windows EXE 安装包，不再只打开发布页面
+
 ## [1.15.5] - 2026-05-22
 
 ### Added
