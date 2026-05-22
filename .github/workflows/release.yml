@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*'
+      - 'v[0-9]*.[0-9]*.[0-9]*'
 
 permissions:
   contents: write
@@ -21,7 +21,7 @@ jobs:
       - name: Validate tag format
         shell: pwsh
         run: |
-          if ('${{ github.ref_name }}' -notmatch '^\d+\.\d+\.\d+$') {
+          if ('${{ github.ref_name }}' -notmatch '^v?\d+\.\d+\.\d+$') {
             throw "Unsupported tag format: ${{ github.ref_name }}"
           }
 
@@ -47,7 +47,8 @@ jobs:
       - name: Extract release notes
         shell: pwsh
         run: |
-          python scripts/extract_release_notes.py CHANGELOG.md ${{ github.ref_name }} | Out-File -FilePath release_notes.md -Encoding utf8
+          $version = '${{ github.ref_name }}' -replace '^v', ''
+          python scripts/extract_release_notes.py CHANGELOG.md $version | Out-File -FilePath release_notes.md -Encoding utf8
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2

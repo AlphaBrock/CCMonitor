@@ -31,6 +31,10 @@ def _make_app(thresholds: list[float] | None = None) -> UsageMonitorForClaude:
          patch('src.runtime.app.taskbar_uses_light_theme', return_value=False):
         app = UsageMonitorForClaude()
     app.icon = MagicMock()
+    app._locked_patch = patch('src.runtime.app.is_workstation_locked', return_value=False)
+    app._locked_patch.start()
+    app._idle_patch = patch('src.runtime.app.get_idle_seconds', return_value=0.0)
+    app._idle_patch.start()
     app._thresholds_patch = patch('src.runtime.app.get_alert_thresholds', return_value=thresholds)
     app._thresholds_patch.start()
     return app
@@ -38,6 +42,8 @@ def _make_app(thresholds: list[float] | None = None) -> UsageMonitorForClaude:
 
 def _cleanup(app: UsageMonitorForClaude) -> None:
     """Stop patches started by _make_app."""
+    app._idle_patch.stop()
+    app._locked_patch.stop()
     app._thresholds_patch.stop()
 
 
