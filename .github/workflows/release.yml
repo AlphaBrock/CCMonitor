@@ -48,7 +48,7 @@ jobs:
         shell: pwsh
         run: |
           $version = '${{ github.ref_name }}' -replace '^v', ''
-          python scripts/extract_release_notes.py CHANGELOG.md $version | Out-File -FilePath release_notes.md -Encoding utf8
+          python scripts/extract_release_notes.py CHANGELOG.md $version release_notes.md
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
