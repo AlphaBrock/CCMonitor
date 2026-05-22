@@ -18,21 +18,23 @@ from typing import Any
 
 import pystray  # type: ignore[import-untyped]  # no type stubs available
 
-from .api import api_headers
-from .autostart import is_autostart_enabled, set_autostart, sync_autostart_path
 from .cache import UsageCache
-from .claude_cli import PROJECT_URL
-from .command import run_event_command
 from .idle import get_idle_seconds, is_workstation_locked
-from .settings import (
-    ALERT_TIME_AWARE, ALERT_TIME_AWARE_BELOW, ICON_FIELDS, IDLE_PAUSE,
+from src.integrations.api import api_headers
+from src import __version__
+from src.integrations.autostart import is_autostart_enabled, set_autostart, sync_autostart_path
+from src.integrations.claude_cli import PROJECT_URL, check_latest_version
+from src.integrations.command import run_event_command
+from src.presentation.formatting import elapsed_pct, field_period, format_credits, format_tooltip, parse_field_name, popup_label
+from src.presentation.i18n import ACTIVE_LANG, T, available_languages
+from src.presentation.settings import (
+    ALERT_TIME_AWARE, ALERT_TIME_AWARE_BELOW, ICON_FIELDS, IDLE_PAUSE, LANGUAGE,
     ON_RESET_COMMAND, ON_STARTUP_COMMAND, ON_THRESHOLD_COMMAND,
     POLL_ERROR, POLL_FAST, POLL_FAST_EXTRA, POLL_INTERVAL, get_alert_thresholds,
+    save_language_setting,
 )
-from .formatting import elapsed_pct, field_period, format_credits, format_tooltip, parse_field_name, popup_label
-from .i18n import T
-from .popup import UsagePopup
-from .tray_icon import create_icon_image, create_status_image, taskbar_uses_light_theme, watch_theme_change
+from src.ui.popup import UsagePopup
+from src.ui.tray_icon import create_icon_image, create_status_image, taskbar_uses_light_theme, watch_theme_change
 
 __all__ = ['UsageMonitorForClaude', 'crash_log']
 
@@ -64,16 +66,16 @@ class UsageMonitorForClaude:
         self._idle_reset_pending = False
         self._deferred_notifications: dict[str, tuple[str, str]] = {}
 
-        # Popup state
-        self._popup_lock = threading.Lock()
-        self._popup_open = False
-        self._popup_closed_at = 0.0
+        # Popup window state
+        self.popup: UsagePopup | None = None
         self._next_poll_time: float | None = None
 
         # Theme state
         self._light_taskbar = taskbar_uses_light_theme()
 
         self.restart_requested = False
+
+        self._update_checking = False
 
         self.icon = pystray.Icon(
             'usage_monitor',
@@ -87,6 +89,15 @@ class UsageMonitorForClaude:
                     checked=lambda item: is_autostart_enabled(),
                     visible=getattr(sys, 'frozen', False),
                 ),
+                pystray.MenuItem(T['menu_language'], pystray.Menu(
+                    pystray.MenuItem(
+                        T['menu_language_auto'],
+                        self._make_lang_handler(''),
+                        checked=lambda item: not LANGUAGE,
+                    ),
+                    pystray.Menu.SEPARATOR,
+                    *self._build_language_items(),
+                )),
                 pystray.MenuItem(T['test_commands'], pystray.Menu(
                     pystray.MenuItem(T['test_reset_5h'], self.on_test_reset_5h, enabled=bool(ON_RESET_COMMAND)),
                     pystray.MenuItem(T['test_reset_7d'], self.on_test_reset_7d, enabled=bool(ON_RESET_COMMAND)),
@@ -94,6 +105,7 @@ class UsageMonitorForClaude:
                     pystray.MenuItem(T['test_threshold_7d'], self.on_test_threshold_7d, enabled=bool(ON_THRESHOLD_COMMAND)),
                     pystray.MenuItem(T['test_startup'], self.on_test_startup, enabled=bool(ON_STARTUP_COMMAND)),
                 ), enabled=bool(ON_RESET_COMMAND or ON_STARTUP_COMMAND or ON_THRESHOLD_COMMAND)),
+                pystray.MenuItem(T['check_update'], self.on_check_update),
                 pystray.MenuItem(T['restart'], self.on_restart),
                 pystray.Menu.SEPARATOR,
                 pystray.MenuItem(T['menu_project'], self.on_open_project),
@@ -105,13 +117,7 @@ class UsageMonitorForClaude:
     # Menu actions
 
     def on_show_popup(self, icon: Any = None, item: Any = None) -> None:
-        with self._popup_lock:
-            if self._popup_open:
-                return
-            if time.time() - self._popup_closed_at < 0.15:
-                return
-            self._popup_open = True
-        threading.Thread(target=self._open_popup, daemon=True).start()
+        self._ensure_popup().show()
 
     def on_toggle_autostart(self, icon: Any = None, item: Any = None) -> None:
         set_autostart(not is_autostart_enabled())
@@ -122,6 +128,53 @@ class UsageMonitorForClaude:
 
     def on_open_project(self, icon: Any = None, item: Any = None) -> None:
         webbrowser.open(PROJECT_URL)
+
+    def on_check_update(self, icon: Any = None, item: Any = None) -> None:
+        if self._update_checking:
+            return
+        self._update_checking = True
+        threading.Thread(target=self._do_check_update, daemon=True).start()
+
+    def _do_check_update(self) -> None:
+        """Run the update check in a background thread."""
+        try:
+            result = check_latest_version(__version__)
+            if result.error:
+                self.icon.notify(T['update_check_error'], T['popup_title'])
+            elif result.available:
+                self.icon.notify(
+                    T['update_available'].format(new=result.version, current=__version__),
+                    T['update_available_title'],
+                )
+                webbrowser.open(result.url)
+            else:
+                self.icon.notify(
+                    T['update_latest'].format(current=__version__),
+                    T['popup_title'],
+                )
+        except Exception:
+            self.icon.notify(T['update_check_error'], T['popup_title'])
+        finally:
+            self._update_checking = False
+
+    def _build_language_items(self) -> list:
+        """Build pystray MenuItems for each available language."""
+        items = []
+        for code, name in available_languages():
+            items.append(pystray.MenuItem(
+                name,
+                self._make_lang_handler(code),
+                checked=lambda item, c=code: ACTIVE_LANG == c and bool(LANGUAGE),
+            ))
+        return items
+
+    def _make_lang_handler(self, lang_code: str):
+        """Return a menu click handler that switches to the given language."""
+        def handler(icon: Any = None, item: Any = None) -> None:
+            save_language_setting(lang_code)
+            self.restart_requested = True
+            self.on_quit(icon, item)
+        return handler
 
     def on_test_reset_5h(self, icon: Any = None, item: Any = None) -> None:
         run_event_command(ON_RESET_COMMAND, {
@@ -182,32 +235,17 @@ class UsageMonitorForClaude:
 
     def on_quit(self, icon: Any = None, item: Any = None) -> None:
         self.running = False
+        if self.popup is not None:
+            self.popup.close()
         self.icon.stop()
 
     # Popup
 
-    def _open_popup(self) -> None:
-        # _popup_open is set True under _popup_lock (in on_show_popup) and
-        # reset here without the lock.  This is safe because False is the
-        # permissive default - a momentary stale True only delays the next open.
-        try:
-            needs_profile = not self.cache.profile
-            needs_refresh = self.cache.last_success_time is None or time.time() - self.cache.last_success_time >= POLL_FAST
-            if needs_profile or needs_refresh:
-                # Single thread: ensure_profile() and update() both acquire
-                # cache._lock, so they must run sequentially.  Two threads
-                # would cause update()'s non-blocking acquire to fail while
-                # ensure_profile() holds the lock.
-                def _bg_refresh() -> None:
-                    if needs_profile:
-                        self.cache.ensure_profile()
-                    if needs_refresh:
-                        self.update()
-                threading.Thread(target=_bg_refresh, daemon=True).start()
-            UsagePopup(self)
-        finally:
-            self._popup_closed_at = time.time()
-            self._popup_open = False
+    def _ensure_popup(self) -> UsagePopup:
+        """Create the popup window on first access."""
+        if self.popup is None:
+            self.popup = UsagePopup(self)
+        return self.popup
 
     # Tray rendering
 
@@ -676,6 +714,7 @@ class UsageMonitorForClaude:
                 sync_autostart_path()
             if not api_headers():
                 icon.notify(f"{T['warn_no_token']}\n{T['warn_login']}", T['popup_title'])
+            self.on_show_popup()
             threading.Thread(target=watch_theme_change, args=(self._on_theme_changed,), daemon=True).start()
             self.poll_loop()
         except Exception:

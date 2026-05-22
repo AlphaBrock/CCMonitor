@@ -17,7 +17,7 @@ from typing import Any
 
 import requests
 
-from .i18n import T
+from src.presentation.i18n import T
 
 __all__ = ['API_URL_USAGE', 'API_URL_PROFILE', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CREDENTIALS', 'read_access_token', 'api_headers', 'fetch_usage', 'fetch_profile']
 
@@ -107,7 +107,7 @@ def fetch_profile() -> dict[str, Any] | None:
 
 def _user_agent() -> str:
     """Return the User-Agent string with the installed Claude Code version."""
-    from .claude_cli import CLAUDE_CLI_PATH, cli_version
+    from src.integrations.claude_cli import CLAUDE_CLI_PATH, cli_version
 
     version = cli_version(CLAUDE_CLI_PATH)
     return f'claude-code/{version}' if version else _FALLBACK_USER_AGENT

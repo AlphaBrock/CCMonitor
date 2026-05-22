@@ -11,13 +11,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from usage_monitor_for_claude.command import run_event_command
+from src.integrations.command import run_event_command
 
 
 class TestRunEventCommand(unittest.TestCase):
     """Tests for run_event_command() subprocess launching."""
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_command_executed_with_shell(self, mock_popen: MagicMock):
         """Command is passed to Popen with shell=True."""
         run_event_command(['echo hello'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -27,7 +27,7 @@ class TestRunEventCommand(unittest.TestCase):
         self.assertEqual(args[0], 'echo hello')
         self.assertTrue(kwargs['shell'])
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_env_vars_merged_into_environment(self, mock_popen: MagicMock):
         """Event-specific variables are merged into the process environment."""
         env_vars = {
@@ -41,16 +41,16 @@ class TestRunEventCommand(unittest.TestCase):
         for key, value in env_vars.items():
             self.assertEqual(passed_env[key], value)
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_version_env_var_always_present(self, mock_popen: MagicMock):
         """USAGE_MONITOR_VERSION is always set from __version__."""
         run_event_command(['test'], {'USAGE_MONITOR_EVENT': 'reset'})
 
         passed_env = mock_popen.call_args[1]['env']
-        from usage_monitor_for_claude import __version__
+        from src import __version__
         self.assertEqual(passed_env['USAGE_MONITOR_VERSION'], __version__)
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_existing_env_preserved(self, mock_popen: MagicMock):
         """Existing environment variables are preserved alongside new ones."""
         with patch.dict('os.environ', {'PATH': '/usr/bin', 'HOME': '/home/user'}):
@@ -61,7 +61,7 @@ class TestRunEventCommand(unittest.TestCase):
         self.assertEqual(passed_env['HOME'], '/home/user')
         self.assertEqual(passed_env['USAGE_MONITOR_EVENT'], 'reset')
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_stdout_stderr_devnull(self, mock_popen: MagicMock):
         """stdout and stderr are redirected to DEVNULL."""
         run_event_command(['test'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -70,7 +70,7 @@ class TestRunEventCommand(unittest.TestCase):
         self.assertEqual(kwargs['stdout'], subprocess.DEVNULL)
         self.assertEqual(kwargs['stderr'], subprocess.DEVNULL)
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_create_no_window_flag(self, mock_popen: MagicMock):
         """CREATE_NO_WINDOW flag is set."""
         run_event_command(['test'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -78,30 +78,30 @@ class TestRunEventCommand(unittest.TestCase):
         kwargs = mock_popen.call_args[1]
         self.assertEqual(kwargs['creationflags'], subprocess.CREATE_NO_WINDOW)
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_empty_list_skipped(self, mock_popen: MagicMock):
         """Empty command list does not invoke Popen."""
         run_event_command([], {'USAGE_MONITOR_EVENT': 'reset'})
 
         mock_popen.assert_not_called()
 
-    @patch('usage_monitor_for_claude.command.traceback.print_exc')
-    @patch('usage_monitor_for_claude.command.subprocess.Popen', side_effect=OSError('not found'))
+    @patch('src.integrations.command.traceback.print_exc')
+    @patch('src.integrations.command.subprocess.Popen', side_effect=OSError('not found'))
     def test_popen_exception_caught(self, mock_popen: MagicMock, mock_print_exc: MagicMock):
         """OSError from Popen is caught and printed to stderr."""
         run_event_command(['nonexistent_command'], {'USAGE_MONITOR_EVENT': 'reset'})
 
         mock_print_exc.assert_called_once()
 
-    @patch('usage_monitor_for_claude.command.traceback.print_exc')
-    @patch('usage_monitor_for_claude.command.subprocess.Popen', side_effect=ValueError('bad'))
+    @patch('src.integrations.command.traceback.print_exc')
+    @patch('src.integrations.command.subprocess.Popen', side_effect=ValueError('bad'))
     def test_unexpected_exception_caught(self, mock_popen: MagicMock, mock_print_exc: MagicMock):
         """Unexpected exceptions from Popen are caught and printed to stderr."""
         run_event_command(['bad_command'], {'USAGE_MONITOR_EVENT': 'reset'})
 
         mock_print_exc.assert_called_once()
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_popen_not_waited(self, mock_popen: MagicMock):
         """Popen result is not waited on (fire-and-forget)."""
         run_event_command(['long_running'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -110,7 +110,7 @@ class TestRunEventCommand(unittest.TestCase):
         mock_process.wait.assert_not_called()
         mock_process.communicate.assert_not_called()
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_cwd_set_to_project_root(self, mock_popen: MagicMock):
         """Working directory is set to the project root (non-frozen)."""
         run_event_command(['test'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -119,8 +119,8 @@ class TestRunEventCommand(unittest.TestCase):
         expected = Path(__file__).resolve().parent.parent
         self.assertEqual(kwargs['cwd'], expected)
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
-    @patch('usage_monitor_for_claude.command.sys')
+    @patch('src.integrations.command.subprocess.Popen')
+    @patch('src.integrations.command.sys')
     def test_cwd_set_to_executable_dir_when_frozen(self, mock_sys: MagicMock, mock_popen: MagicMock):
         """Working directory is set to the executable's folder when frozen."""
         mock_sys.frozen = True
@@ -131,7 +131,7 @@ class TestRunEventCommand(unittest.TestCase):
         kwargs = mock_popen.call_args[1]
         self.assertEqual(kwargs['cwd'], Path('C:\\Program Files\\MyApp'))
 
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_multiple_commands_all_executed(self, mock_popen: MagicMock):
         """All commands in the list are launched."""
         run_event_command(['cmd1', 'cmd2', 'cmd3'], {'USAGE_MONITOR_EVENT': 'reset'})
@@ -140,8 +140,8 @@ class TestRunEventCommand(unittest.TestCase):
         executed = [call[0][0] for call in mock_popen.call_args_list]
         self.assertEqual(executed, ['cmd1', 'cmd2', 'cmd3'])
 
-    @patch('usage_monitor_for_claude.command.traceback.print_exc')
-    @patch('usage_monitor_for_claude.command.subprocess.Popen')
+    @patch('src.integrations.command.traceback.print_exc')
+    @patch('src.integrations.command.subprocess.Popen')
     def test_one_failure_does_not_block_others(self, mock_popen: MagicMock, mock_print_exc: MagicMock):
         """A failing command does not prevent subsequent commands from running."""
         mock_popen.side_effect = [OSError('fail'), MagicMock()]

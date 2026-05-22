@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "您的额外用量已达到 {pct}% ({used} / {limit})。",
     "extra_usage": "额外用量",
     "extra_usage_spent": "已用 {used} / {limit}",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "更新日志",
     "notify_update_title": "Claude Code 已更新",
     "notify_update": "Claude Code 已从 {old} 更新到 {new}。",
     "server_error": "Anthropic API 暂时不可用 (HTTP {code})。",
@@ -61,5 +59,14 @@
     "status_updated_s": "{s}秒前更新",
     "status_next_update": "{duration}后更新",
     "status_refreshing": "刷新中...",
-    "already_running": "Usage Monitor for Claude v{running_version} 已在运行中。\n\n是否要替换正在运行的实例？"
+    "already_running": "Usage Monitor for Claude v{running_version} 已在运行中。\n\n是否要替换正在运行的实例？",
+    "pin_on": "已置顶",
+    "pin_off": "未置顶",
+    "menu_language": "语言",
+    "menu_language_auto": "自动",
+    "check_update": "检查更新",
+    "update_available_title": "发现新版本",
+    "update_available": "新版本 {new} 可用（当前版本：{current}）。",
+    "update_latest": "您正在使用最新版本（{current}）。",
+    "update_check_error": "无法检查更新。"
 }

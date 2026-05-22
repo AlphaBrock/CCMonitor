@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "추가 사용량이 {pct}%에 도달했습니다 ({used} / {limit}).",
     "extra_usage": "추가 사용량",
     "extra_usage_spent": "{used} / {limit} 사용",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "변경 내역",
     "notify_update_title": "Claude Code 업데이트됨",
     "notify_update": "Claude Code가 {old}에서 {new}(으)로 업데이트되었습니다.",
     "server_error": "Anthropic API가 일시적으로 사용할 수 없습니다 (HTTP {code}).",
@@ -61,5 +59,14 @@
     "status_updated_s": "{s}초 전에 업데이트됨",
     "status_next_update": "다음 업데이트 {duration} 후",
     "status_refreshing": "새로고침 중...",
-    "already_running": "Usage Monitor for Claude v{running_version}가 실행 중입니다.\n\n실행 중인 인스턴스를 교체하시겠습니까?"
+    "already_running": "Usage Monitor for Claude v{running_version}가 실행 중입니다.\n\n실행 중인 인스턴스를 교체하시겠습니까?",
+    "pin_on": "고정됨",
+    "pin_off": "고정 해제",
+    "menu_language": "언어",
+    "menu_language_auto": "자동",
+    "check_update": "업데이트 확인",
+    "update_available_title": "업데이트 가능",
+    "update_available": "버전 {new}을(를) 사용할 수 있습니다 (현재: {current}).",
+    "update_latest": "최신 버전 ({current})을 사용 중입니다.",
+    "update_check_error": "업데이트를 확인할 수 없습니다."
 }

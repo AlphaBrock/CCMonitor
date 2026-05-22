@@ -171,7 +171,7 @@ def _credentials_status() -> str:
 
 def print_startup_diagnostics() -> None:
     """Print system and environment diagnostics before webview starts."""
-    from . import __version__
+    from src import __version__
 
     print(f'\n  Usage Monitor for Claude v{__version__} - Verbose Mode')
     print(f'  {"=" * 48}')

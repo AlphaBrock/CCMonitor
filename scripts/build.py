@@ -5,7 +5,7 @@ Build Script
 Builds a standalone EXE for Usage Monitor for Claude using PyInstaller.
 
 Usage:
-    python build.py
+    python scripts/build.py
 
 Produces:
     dist/UsageMonitorForClaude.exe
@@ -16,9 +16,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).parent
+ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / 'dist'
-SPEC = ROOT / 'usage_monitor_for_claude.spec'
+SPEC = ROOT / 'packaging' / 'ccmonitor.spec'
 
 
 def build() -> None:

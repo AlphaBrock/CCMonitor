@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "Penggunaan ekstra Anda telah mencapai {pct}% ({used} / {limit}).",
     "extra_usage": "PENGGUNAAN EKSTRA",
     "extra_usage_spent": "{used} / {limit} terpakai",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "Changelog",
     "notify_update_title": "Claude Code Diperbarui",
     "notify_update": "Claude Code diperbarui dari {old} ke {new}.",
     "server_error": "API Anthropic tidak tersedia sementara (HTTP {code}).",
@@ -61,5 +59,14 @@
     "status_updated_s": "Diperbarui {s}d yang lalu",
     "status_next_update": "Pembaruan berikutnya dalam {duration}",
     "status_refreshing": "Memperbarui...",
-    "already_running": "Usage Monitor for Claude v{running_version} sudah berjalan.\n\nApakah Anda ingin mengganti instans yang sedang berjalan?"
+    "already_running": "Usage Monitor for Claude v{running_version} sudah berjalan.\n\nApakah Anda ingin mengganti instans yang sedang berjalan?",
+    "pin_on": "Disematkan",
+    "pin_off": "Tidak disematkan",
+    "menu_language": "Bahasa",
+    "menu_language_auto": "Otomatis",
+    "check_update": "Periksa pembaruan",
+    "update_available_title": "Pembaruan tersedia",
+    "update_available": "Versi {new} tersedia (saat ini: {current}).",
+    "update_latest": "Anda menggunakan versi terbaru ({current}).",
+    "update_check_error": "Tidak dapat memeriksa pembaruan."
 }

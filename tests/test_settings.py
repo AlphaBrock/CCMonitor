@@ -12,12 +12,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
-import usage_monitor_for_claude.settings as settings_mod
+import src.presentation.settings as settings_mod
 
 
 def _load(app_dir: Path, home_dir: Path) -> dict:
     """Call _load_settings with controlled app_dir and home_dir."""
-    fake_file = str(app_dir / 'usage_monitor_for_claude' / 'settings.py')
+    fake_file = str(app_dir / 'src' / 'presentation' / 'settings.py')
     with patch.object(settings_mod, '__file__', fake_file), \
          patch.object(Path, 'home', return_value=home_dir), \
          patch.object(settings_mod, 'ctypes', MagicMock()):
@@ -57,7 +57,7 @@ class TestLoadSettings(unittest.TestCase):
             config_dir = Path(config_tmp)
             settings = {'bg': '#111111'}
             (config_dir / settings_mod.SETTINGS_FILENAME).write_text(json.dumps(settings), encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.dict('os.environ', {'CLAUDE_CONFIG_DIR': config_tmp}), \
                  patch.object(settings_mod, 'ctypes', MagicMock()):
@@ -71,7 +71,7 @@ class TestLoadSettings(unittest.TestCase):
             claude_dir.mkdir()
             settings = {'bg': '#222222'}
             (claude_dir / settings_mod.SETTINGS_FILENAME).write_text(json.dumps(settings), encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
                  patch.dict('os.environ', {'CLAUDE_CONFIG_DIR': config_tmp}), \
@@ -86,7 +86,7 @@ class TestLoadSettings(unittest.TestCase):
             claude_dir.mkdir()
             (claude_dir / settings_mod.SETTINGS_FILENAME).write_text(json.dumps({'bg': '#home'}), encoding='utf-8')
             (Path(config_tmp) / settings_mod.SETTINGS_FILENAME).write_text(json.dumps({'bg': '#custom'}), encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
                  patch.dict('os.environ', {'CLAUDE_CONFIG_DIR': config_tmp}), \
@@ -101,7 +101,7 @@ class TestLoadSettings(unittest.TestCase):
             claude_dir.mkdir()
             settings = {'bg': '#333333'}
             (claude_dir / settings_mod.SETTINGS_FILENAME).write_text(json.dumps(settings), encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
                  patch.dict('os.environ', {'CLAUDE_CONFIG_DIR': str(claude_dir)}), \
@@ -153,7 +153,7 @@ class TestLoadSettings(unittest.TestCase):
         """Malformed JSON triggers a Windows MessageBox."""
         with TemporaryDirectory() as app_tmp, TemporaryDirectory() as home_tmp:
             (Path(app_tmp) / settings_mod.SETTINGS_FILENAME).write_text('{broken', encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             mock_ctypes = MagicMock()
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
@@ -178,7 +178,7 @@ class TestLoadSettings(unittest.TestCase):
     def test_unreadable_file_returns_empty_dict(self):
         """File that cannot be read returns empty dict."""
         with TemporaryDirectory() as app_tmp, TemporaryDirectory() as home_tmp:
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
                  patch.object(settings_mod, 'ctypes', MagicMock()), \
@@ -204,7 +204,7 @@ class TestLoadSettings(unittest.TestCase):
         with TemporaryDirectory() as app_tmp, TemporaryDirectory() as home_tmp:
             settings = {'poll_interval': 'not_a_number', 'poll_fast': 30}
             (Path(app_tmp) / settings_mod.SETTINGS_FILENAME).write_text(json.dumps(settings), encoding='utf-8')
-            fake_file = str(Path(app_tmp) / 'usage_monitor_for_claude' / 'settings.py')
+            fake_file = str(Path(app_tmp) / 'src' / 'presentation' / 'settings.py')
             mock_ctypes = MagicMock()
             with patch.object(settings_mod, '__file__', fake_file), \
                  patch.object(Path, 'home', return_value=Path(home_tmp)), \
@@ -232,8 +232,20 @@ class TestSettingsOverrides(unittest.TestCase):
 
     def test_popup_color_overrides(self):
         """Popup color constants are overridden by settings."""
-        settings = {'bg': '#000000', 'fg': '#ffffff', 'bar_fg': '#00ff00'}
-        self._assert_overrides(settings, [('bg', '#000000'), ('fg', '#ffffff'), ('bar_fg', '#00ff00')])
+        settings = {
+            'bg': '#000000',
+            'fg': '#ffffff',
+            'bar_fg': '#00ff00',
+            'bar_fg_mid': '#00aa88',
+            'bar_fg_danger': '#ff0033',
+        }
+        self._assert_overrides(settings, [
+            ('bg', '#000000'),
+            ('fg', '#ffffff'),
+            ('bar_fg', '#00ff00'),
+            ('bar_fg_mid', '#00aa88'),
+            ('bar_fg_danger', '#ff0033'),
+        ])
 
     def test_partial_override_keeps_defaults(self):
         """Overriding one key does not affect other keys."""

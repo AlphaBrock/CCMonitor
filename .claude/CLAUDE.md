@@ -29,7 +29,7 @@ Prioritize readability and auditability - users handle credentials and must be a
 - No file write operations - the app is read-only
 - No `eval()`, `exec()`, `compile()`, or dynamic imports - no dynamic code execution
 - No obfuscation - no base64-encoded strings, no encoded URLs or tokens
-- Modular package architecture in `usage_monitor_for_claude/` - small focused modules are easier to audit than one large file
+- Modular package architecture in `src/` with sub-packages (`integrations/`, `presentation/`, `runtime/`, `ui/`) - small focused modules are easier to audit than one large file
 - Security-critical code (credentials, API calls) isolated in `api.py` - the only module handling credentials
 - Pure data files (translations, config) stay separate - they contain no logic or credential access
 - Minimal, well-known dependencies only (e.g., requests, Pillow, pystray)
@@ -58,7 +58,8 @@ Prioritize readability and auditability - users handle credentials and must be a
 ## Imports
 - Three groups separated by blank lines: standard library, third-party, local
 - Within groups: `import` before `from...import`, sorted alphabetically
-- Relative imports within the `usage_monitor_for_claude` package (e.g. `from .api import ...`), except `__main__.py` which requires absolute imports for PyInstaller compatibility
+- Relative imports within the same sub-package (e.g. `from .cache import ...` inside `runtime/`); absolute `from src.*` imports for cross-sub-package references (e.g. `from src.integrations.api import ...` inside `runtime/`)
+- `__main__.py` requires absolute imports for PyInstaller compatibility
 - Absolute imports for external packages, avoid wildcards
 
 ## Structure
@@ -81,7 +82,7 @@ Prioritize readability and auditability - users handle credentials and must be a
 - Early returns and guard clauses
 
 ## PyInstaller / Build
-- Spec file: `usage_monitor_for_claude.spec` - all build config lives there
+- Spec file: `packaging/ccmonitor.spec` - all build config lives there
 - When adding new data files (translations, configs, assets): add them to the `datas` list in the spec file
 - When adding new imports: check if PyInstaller detects them automatically; if not, add to `hiddenimports`
 - Never exclude standard library modules that are transitive dependencies (e.g., `email` is needed by `urllib3`/`requests`)
@@ -111,7 +112,7 @@ Prioritize readability and auditability - users handle credentials and must be a
 - Before writing a changelog entry for a fix, check `git log` to verify the bug existed in the latest release - if it was introduced after the release tag, it does not get a changelog entry
 
 ## Releasing
-- Update `__version__` in `usage_monitor_for_claude/__init__.py` and all four version fields in `version_info.py` (`filevers`, `prodvers`, `FileVersion`, `ProductVersion`)
+- Update `__version__` in `src/__init__.py` and all four version fields in `packaging/version_info.py` (`filevers`, `prodvers`, `FileVersion`, `ProductVersion`)
 - In `CHANGELOG.md`: rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` section above it, and update the compare links
 - GitHub release notes (`gh release create vX.Y.Z dist/UsageMonitorForClaude.exe --title "vX.Y.Z" --notes "..."`) must use the exact content from the version's `CHANGELOG.md` section (the `### Added` / `### Changed` / `### Fixed` / `### Removed` blocks), followed by a `[Full changelog](compare-url)` link and a `[README for this version](https://github.com/jens-duttke/usage-monitor-for-claude/blob/vX.Y.Z/README.md)` link
 

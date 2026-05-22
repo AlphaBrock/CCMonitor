@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "Tu uso extra ha alcanzado el {pct}% ({used} / {limit}).",
     "extra_usage": "USO EXTRA",
     "extra_usage_spent": "{used} / {limit} gastado",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "Changelog",
     "notify_update_title": "Claude Code actualizado",
     "notify_update": "Claude Code actualizado de {old} a {new}.",
     "server_error": "La API de Anthropic no está disponible temporalmente (HTTP {code}).",
@@ -61,5 +59,14 @@
     "status_updated_s": "Actualizado hace {s}s",
     "status_next_update": "Próxima actualización en {duration}",
     "status_refreshing": "Actualizando...",
-    "already_running": "Usage Monitor for Claude v{running_version} ya se está ejecutando.\n\n¿Desea reemplazar la instancia en ejecución?"
+    "already_running": "Usage Monitor for Claude v{running_version} ya se está ejecutando.\n\n¿Desea reemplazar la instancia en ejecución?",
+    "pin_on": "Fijado",
+    "pin_off": "No fijado",
+    "menu_language": "Idioma",
+    "menu_language_auto": "Automático",
+    "check_update": "Buscar actualizaciones",
+    "update_available_title": "Actualización disponible",
+    "update_available": "La versión {new} está disponible (actual: {current}).",
+    "update_latest": "Está usando la versión más reciente ({current}).",
+    "update_check_error": "No se pudo buscar actualizaciones."
 }

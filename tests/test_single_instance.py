@@ -11,12 +11,12 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-MODULE = 'usage_monitor_for_claude.single_instance'
+MODULE = 'src.runtime.single_instance'
 
 
 def _reset_globals():
     """Reset module-level handles to None between tests."""
-    import usage_monitor_for_claude.single_instance as si
+    import src.runtime.single_instance as si
     si._mutex_handle = None
     si._pid_mapping_handle = None
 
@@ -32,14 +32,14 @@ class TestSharedMemoryRoundTrip(unittest.TestCase):
         _reset_globals()
 
     def tearDown(self):
-        import usage_monitor_for_claude.single_instance as si
+        import src.runtime.single_instance as si
         if si._pid_mapping_handle:
             si._kernel32.CloseHandle(si._pid_mapping_handle)
             si._pid_mapping_handle = None
 
     @patch(f'{MODULE}.__version__', '2.5.3')
     def test_round_trip_returns_pid_and_version(self):
-        from usage_monitor_for_claude.single_instance import _read_holder_info, _store_holder_info
+        from src.runtime.single_instance import _read_holder_info, _store_holder_info
 
         _store_holder_info()
         pid, version = _read_holder_info()
@@ -49,7 +49,7 @@ class TestSharedMemoryRoundTrip(unittest.TestCase):
 
     @patch(f'{MODULE}.__version__', '0.0.1')
     def test_round_trip_short_version(self):
-        from usage_monitor_for_claude.single_instance import _read_holder_info, _store_holder_info
+        from src.runtime.single_instance import _read_holder_info, _store_holder_info
 
         _store_holder_info()
         pid, version = _read_holder_info()
@@ -60,7 +60,7 @@ class TestSharedMemoryRoundTrip(unittest.TestCase):
     @patch(f'{MODULE}.__version__', 'a' * 100)
     def test_long_version_is_truncated(self):
         """Version strings exceeding shared memory size are truncated, not crashed."""
-        from usage_monitor_for_claude.single_instance import _read_holder_info, _store_holder_info
+        from src.runtime.single_instance import _read_holder_info, _store_holder_info
 
         _store_holder_info()
         pid, version = _read_holder_info()
@@ -93,7 +93,7 @@ class TestEnsureSingleInstance(unittest.TestCase):
         mock_kernel32.CreateMutexW.return_value = 42
 
         with patch(f'{MODULE}._kernel32', mock_kernel32):
-            from usage_monitor_for_claude.single_instance import ensure_single_instance
+            from src.runtime.single_instance import ensure_single_instance
             result = ensure_single_instance()
 
         self.assertTrue(result)
@@ -114,7 +114,7 @@ class TestEnsureSingleInstance(unittest.TestCase):
 
         with patch(f'{MODULE}._kernel32', mock_kernel32), \
              patch(f'{MODULE}.ctypes.windll.user32', mock_user32):
-            from usage_monitor_for_claude.single_instance import ensure_single_instance
+            from src.runtime.single_instance import ensure_single_instance
             result = ensure_single_instance()
 
         self.assertTrue(result)
@@ -134,7 +134,7 @@ class TestEnsureSingleInstance(unittest.TestCase):
 
         with patch(f'{MODULE}._kernel32', mock_kernel32), \
              patch(f'{MODULE}.ctypes.windll.user32', mock_user32):
-            from usage_monitor_for_claude.single_instance import ensure_single_instance
+            from src.runtime.single_instance import ensure_single_instance
             result = ensure_single_instance()
 
         self.assertFalse(result)
@@ -152,7 +152,7 @@ class TestEnsureSingleInstance(unittest.TestCase):
 
         with patch(f'{MODULE}._kernel32', mock_kernel32), \
              patch(f'{MODULE}.ctypes.windll.user32', mock_user32):
-            from usage_monitor_for_claude.single_instance import ensure_single_instance
+            from src.runtime.single_instance import ensure_single_instance
             ensure_single_instance()
 
         title = mock_user32.MessageBoxW.call_args[0][2]
@@ -171,7 +171,7 @@ class TestEnsureSingleInstance(unittest.TestCase):
 
         with patch(f'{MODULE}._kernel32', mock_kernel32), \
              patch(f'{MODULE}.ctypes.windll.user32', mock_user32):
-            from usage_monitor_for_claude.single_instance import ensure_single_instance
+            from src.runtime.single_instance import ensure_single_instance
             ensure_single_instance()
 
         message = mock_user32.MessageBoxW.call_args[0][1]
@@ -193,7 +193,7 @@ class TestReleaseInstanceLock(unittest.TestCase):
 
     def test_release_closes_both_handles(self):
         """Both mutex and mapping handles are closed and set to None."""
-        import usage_monitor_for_claude.single_instance as si
+        import src.runtime.single_instance as si
         mock_kernel32 = MagicMock()
 
         si._mutex_handle = 100
@@ -208,7 +208,7 @@ class TestReleaseInstanceLock(unittest.TestCase):
 
     def test_release_with_no_handles_is_safe(self):
         """Calling release when no handles are held does not crash."""
-        import usage_monitor_for_claude.single_instance as si
+        import src.runtime.single_instance as si
 
         si._mutex_handle = None
         si._pid_mapping_handle = None

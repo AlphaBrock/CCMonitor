@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "आपका अतिरिक्त उपयोग {pct}% तक पहुँच गया है ({used} / {limit})।",
     "extra_usage": "अतिरिक्त उपयोग",
     "extra_usage_spent": "{used} / {limit} खर्च",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "Changelog",
     "notify_update_title": "Claude Code अपडेट हुआ",
     "notify_update": "Claude Code {old} से {new} में अपडेट हुआ।",
     "server_error": "Anthropic API अस्थायी रूप से अनुपलब्ध है (HTTP {code})।",
@@ -61,5 +59,14 @@
     "status_updated_s": "{s}s पहले अपडेट किया गया",
     "status_next_update": "अगला अपडेट {duration} में",
     "status_refreshing": "रीफ़्रेश हो रहा है...",
-    "already_running": "Usage Monitor for Claude v{running_version} पहले से चल रहा है।\n\nक्या आप चल रही प्रति को बदलना चाहते हैं?"
+    "already_running": "Usage Monitor for Claude v{running_version} पहले से चल रहा है।\n\nक्या आप चल रही प्रति को बदलना चाहते हैं?",
+    "pin_on": "पिन किया गया",
+    "pin_off": "पिन हटाया गया",
+    "menu_language": "भाषा",
+    "menu_language_auto": "स्वचालित",
+    "check_update": "अपडेट की जाँच करें",
+    "update_available_title": "अपडेट उपलब्ध",
+    "update_available": "संस्करण {new} उपलब्ध है (वर्तमान: {current})।",
+    "update_latest": "आप नवीनतम संस्करण ({current}) का उपयोग कर रहे हैं।",
+    "update_check_error": "अपडेट की जाँच नहीं हो सकी।"
 }

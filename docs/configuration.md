@@ -5,8 +5,10 @@ All settings work out of the box - no configuration file is needed. To customize
 ```json
 {
   "poll_interval": 180,
-  "bar_fg": "#00cc66",
-  "bar_fg_warn": "#ff6600"
+  "bar_fg": "#4a9eff",
+  "bar_fg_mid": "#65c18c",
+  "bar_fg_warn": "#ff9f43",
+  "bar_fg_danger": "#ff5d5d"
 }
 ```
 
@@ -60,26 +62,13 @@ Must be an array of non-empty strings. Duplicates are silently removed. An empty
 
 ## Popup fields
 
-The popup shows usage bars for all active quota types by default. Use `popup_fields` to control which bars appear and in what order.
+The desktop window now always shows exactly two quota rows: `five_hour` and `seven_day`. The `popup_fields` setting is still accepted for backward compatibility, but it no longer changes what the window displays.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `popup_fields` | `["*"]` | Which usage fields to show in the popup, in order. `"*"` is a wildcard meaning "all remaining non-null fields in default order" |
+| `popup_fields` | `["*"]` | Deprecated. Accepted for backward compatibility, but ignored by the desktop window |
 
-Must be an array of non-empty strings. `"*"` may appear at most once. Duplicates are silently removed. Unknown field names are accepted - if a field is `null` or missing from the API response, it is simply skipped.
-
-**Known field names:** `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus`, `seven_day_cowork`, `seven_day_oauth_apps`
-
-**Default order** (used for `"*"` and when no setting is present): shorter periods first (`hour` before `day`), base field before variants, variants alphabetically.
-
-**Examples:**
-
-| Setting | Result |
-|---------|--------|
-| *(not set)* | All non-null fields in default order |
-| `["five_hour", "seven_day_sonnet", "*"]` | Session first, then Sonnet, then all remaining |
-| `["five_hour", "seven_day"]` | Only these two, everything else hidden |
-| `["*"]` | Same as not set |
+Must still be an array of non-empty strings. `"*"` may appear at most once. Duplicates are silently removed so existing settings files continue to validate cleanly.
 
 ```json
 {
@@ -176,9 +165,11 @@ Override individual channels as RGBA arrays `[R, G, B, A]` (0-255). Unspecified 
 | `fg` | `"#cccccc"` | Text |
 | `fg_dim` | `"#888888"` | Dimmed text (labels, reset times) |
 | `fg_heading` | `"#ffffff"` | Section headings |
-| `fg_link` | `"#4a9eff"` | Link text (e.g. changelog) |
+| `fg_link` | `"#4a9eff"` | Accent text |
 | `bar_bg` | `"#333333"` | Progress bar background |
-| `bar_fg` | `"#4a9eff"` | Progress bar fill |
-| `bar_fg_warn` | `"#e05050"` | Progress bar fill when usage outpaces elapsed time, error text |
-| `bar_divider` | `"#000c"` | Midnight divider on weekly progress bars |
-| `bar_marker` | `"#fffc"` | Time-position marker on progress bars |
+| `bar_fg` | `"#4a9eff"` | Text bar color for `0-49%` |
+| `bar_fg_mid` | `"#65c18c"` | Text bar color for `50-79%` |
+| `bar_fg_warn` | `"#ff9f43"` | Text bar color for `80-99%` |
+| `bar_fg_danger` | `"#ff3b30"` | Text bar color for `100%+` and status errors |
+| `bar_divider` | `"#000c"` | Legacy key kept for compatibility; no longer used by the desktop window |
+| `bar_marker` | `"#fffc"` | Legacy key kept for compatibility; no longer used by the desktop window |

@@ -1,0 +1,8 @@
+"""
+Integrations Package
+====================
+
+外部系统集成模块。
+"""
+from __future__ import annotations
+

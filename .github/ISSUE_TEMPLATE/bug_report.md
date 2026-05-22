@@ -11,7 +11,7 @@ labels: ''
 
 or from source:
 
-  python -m usage_monitor_for_claude --verbose
+  python -m src --verbose
 
 Paste the output below if you can - it saves a lot of back and forth. -->
 

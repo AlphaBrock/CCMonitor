@@ -52,8 +52,6 @@
     "notify_threshold_extra_usage": "追加使用量が{pct}%に達しました ({used} / {limit})。",
     "extra_usage": "追加使用量",
     "extra_usage_spent": "{used} / {limit} 使用済み",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "変更履歴",
     "notify_update_title": "Claude Code 更新完了",
     "notify_update": "Claude Code が {old} から {new} に更新されました。",
     "server_error": "Anthropic APIが一時的に利用できません (HTTP {code})。",
@@ -61,5 +59,14 @@
     "status_updated_s": "{s}秒前に更新",
     "status_next_update": "次の更新まで{duration}",
     "status_refreshing": "更新中...",
-    "already_running": "Usage Monitor for Claude v{running_version} は既に実行中です。\n\n実行中のインスタンスを置き換えますか？"
+    "already_running": "Usage Monitor for Claude v{running_version} は既に実行中です。\n\n実行中のインスタンスを置き換えますか？",
+    "pin_on": "固定済み",
+    "pin_off": "固定解除",
+    "menu_language": "言語",
+    "menu_language_auto": "自動",
+    "check_update": "更新を確認",
+    "update_available_title": "アップデートあり",
+    "update_available": "バージョン {new} が利用可能です（現在: {current}）。",
+    "update_latest": "最新バージョン ({current}) をご利用中です。",
+    "update_check_error": "アップデートを確認できませんでした。"
 }

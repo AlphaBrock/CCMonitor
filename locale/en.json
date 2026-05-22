@@ -24,7 +24,15 @@
     "duration_hm": "{h}h {m}m",
     "duration_m": "{m}m",
     "duration_s": "{s}s",
-    "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "weekdays": [
+        "Mon",
+        "Tue",
+        "Wed",
+        "Thu",
+        "Fri",
+        "Sat",
+        "Sun"
+    ],
     "loading": "Usage Monitor: Loading...",
     "error_label": "Usage Monitor: Error",
     "connection_error": "Could not connect to Anthropic API.",
@@ -44,8 +52,6 @@
     "notify_threshold_extra_usage": "Your extra usage has reached {pct}% ({used} / {limit}).",
     "extra_usage": "EXTRA USAGE",
     "extra_usage_spent": "{used} / {limit} spent",
-    "claude_code": "CLAUDE CODE",
-    "changelog": "Changelog",
     "notify_update_title": "Claude Code Updated",
     "notify_update": "Claude Code updated from {old} to {new}.",
     "server_error": "Anthropic API temporarily unavailable (HTTP {code}).",
@@ -53,5 +59,14 @@
     "status_updated_s": "Updated {s}s ago",
     "status_next_update": "Next update in {duration}",
     "status_refreshing": "Refreshing...",
-    "already_running": "Usage Monitor for Claude v{running_version} is already running.\n\nDo you want to replace the running instance?"
+    "already_running": "Usage Monitor for Claude v{running_version} is already running.\n\nDo you want to replace the running instance?",
+    "pin_on": "Pinned in place",
+    "pin_off": "Always on top disabled",
+    "menu_language": "Language",
+    "menu_language_auto": "Auto",
+    "check_update": "Check for Updates",
+    "update_available_title": "Update Available",
+    "update_available": "Version {new} is available (current: {current}).",
+    "update_latest": "You are using the latest version ({current}).",
+    "update_check_error": "Could not check for updates."
 }

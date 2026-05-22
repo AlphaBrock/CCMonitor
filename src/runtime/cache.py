@@ -15,9 +15,9 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from .api import fetch_profile, fetch_usage, read_access_token
-from .claude_cli import RefreshResult, refresh_token
-from .settings import MAX_BACKOFF, POLL_FAST, POLL_INTERVAL
+from src.integrations.api import fetch_profile, fetch_usage, read_access_token
+from src.integrations.claude_cli import RefreshResult, refresh_token
+from src.presentation.settings import MAX_BACKOFF, POLL_FAST, POLL_INTERVAL
 
 __all__ = ['CacheSnapshot', 'UpdateResult', 'UsageCache']
 

@@ -16,7 +16,7 @@ import sys
 import traceback
 from pathlib import Path
 
-from . import __version__
+from src import __version__
 
 __all__ = ['run_event_command']
 
@@ -47,7 +47,7 @@ def run_event_command(commands: list[str], env_vars: dict[str, str]) -> None:
     if getattr(sys, 'frozen', False):
         working_dir = Path(sys.executable).parent
     else:
-        working_dir = Path(__file__).resolve().parent.parent
+        working_dir = Path(__file__).resolve().parents[2]
 
     for command in commands:
         try:

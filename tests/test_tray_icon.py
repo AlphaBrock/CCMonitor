@@ -9,7 +9,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import MagicMock, call, patch
 
-import usage_monitor_for_claude.tray_icon as tray_icon_mod
+import src.ui.tray_icon as tray_icon_mod
 
 
 class TestLoadFont(unittest.TestCase):

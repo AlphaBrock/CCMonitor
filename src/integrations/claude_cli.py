@@ -15,6 +15,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+import requests
+
 
 def _discover_cli_path() -> Path:
     """Discover the Claude Code CLI binary path.
@@ -63,12 +65,27 @@ _EXTENSION_DIRS: list[tuple[str, Path]] = [
 _EXTENSION_PREFIX = 'anthropic.claude-code-'
 
 CHANGELOG_URL = 'https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md'
-PROJECT_URL = 'https://github.com/jens-duttke/usage-monitor-for-claude'
+PROJECT_URL = 'https://github.com/AlphaBrock/CCMonitor'
+RELEASES_API_URL = 'https://api.github.com/repos/AlphaBrock/CCMonitor/releases/latest'
 
-__all__ = ['CLAUDE_CLI_PATH', 'CHANGELOG_URL', 'PROJECT_URL', 'ClaudeInstallation', 'RefreshResult', 'cli_version', 'find_installations', 'refresh_token']
+__all__ = [
+    'CLAUDE_CLI_PATH', 'CHANGELOG_URL', 'PROJECT_URL', 'RELEASES_API_URL',
+    'ClaudeInstallation', 'LatestRelease', 'RefreshResult',
+    'check_latest_version', 'cli_version', 'find_installations', 'refresh_token',
+]
 
 # Cache: path → (mtime, version) - avoids re-running subprocess when the binary hasn't changed
 _version_cache: dict[Path, tuple[float, str]] = {}
+
+
+@dataclass
+class LatestRelease:
+    """Result of a GitHub latest-release check."""
+
+    available: bool
+    version: str
+    url: str
+    error: str
 
 
 @dataclass
@@ -213,3 +230,40 @@ def cli_version(path: Path) -> str:
         return version
     except Exception:
         return ''
+
+
+def check_latest_version(current_version: str) -> LatestRelease:
+    """Check GitHub for the latest release version.
+
+    Parameters
+    ----------
+    current_version : str
+        The running application version (e.g. ``'1.15.1'``).
+
+    Returns
+    -------
+    LatestRelease
+        Whether a newer version is available, the latest version string,
+        the release page URL, and any error message.
+    """
+    try:
+        response = requests.get(RELEASES_API_URL, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as exc:
+        return LatestRelease(available=False, version='', url='', error=str(exc)[:200])
+
+    tag = data.get('tag_name', '').lstrip('v')
+    release_url = data.get('html_url', '')
+
+    if not tag:
+        return LatestRelease(available=False, version='', url='', error='No tag in response')
+
+    try:
+        latest_parts = tuple(int(x) for x in tag.split('.'))
+        current_parts = tuple(int(x) for x in current_version.split('.'))
+        newer = latest_parts > current_parts
+    except ValueError:
+        newer = tag != current_version
+
+    return LatestRelease(available=newer, version=tag, url=release_url, error='')

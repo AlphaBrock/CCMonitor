@@ -1,0 +1,218 @@
+<!--
+    Dev preview for the desktop window UI.
+
+    Start server from the project root:
+        python -m http.server 8080 -d src/ui/popup
+
+    Then open: http://localhost:8080/dev.html
+-->
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Popup Dev Preview</title>
+<style>
+    body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #1f1b22;
+        font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+    }
+
+    .dev-controls {
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .dev-controls button {
+        padding: 7px 14px;
+        background: #2d2a2e;
+        color: #fcfcfa;
+        border: 1px solid #4b4750;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .dev-controls button:hover {
+        background: #3a363c;
+    }
+
+    iframe {
+        width: 380px;
+        border: none;
+        background: transparent;
+        visibility: hidden;
+    }
+</style>
+</head>
+<body>
+<div class="dev-controls">
+    <button onclick="loadPreset('full')">Full data</button>
+    <button onclick="loadPreset('minimal')">Minimal</button>
+    <button onclick="loadPreset('danger')">Danger</button>
+    <button onclick="loadPreset('refreshing')">Refreshing</button>
+    <button onclick="loadPreset('loading')">Initial load</button>
+    <button onclick="randomize()">Randomize bars</button>
+</div>
+
+<iframe id="popup" src="popup.html"></iframe>
+
+<script>
+const COLORS = {
+    bg: '#2d2a2e',
+    fg: '#fcfcfa',
+    fg_dim: '#939293',
+    fg_heading: '#ffd866',
+    fg_link: '#78dce8',
+    bar_bg: '#403e41',
+    bar_fg: '#78dce8',
+    bar_fg_mid: '#a9dc76',
+    bar_fg_warn: '#fc9867',
+    bar_fg_danger: '#ff6188',
+};
+
+const T = {
+    title: 'Usage Monitor for Claude',
+    account: 'ACCOUNT',
+    email: 'Email',
+    plan: 'Plan',
+    usage: 'USAGE',
+    extra_usage: 'EXTRA USAGE',
+    status_updated_s: 'Updated {s}s ago',
+    status_updated: 'Updated {duration} ago',
+    status_next_update: 'Next update in {duration}',
+    status_refreshing: 'Refreshing...',
+    duration_hm: '{h}h {m}m',
+    duration_m: '{m}m',
+    duration_s: '{s}s',
+};
+
+const PRESETS = {
+    full: {
+        profile: { email: 'user@example.com', plan: 'Max (Team)' },
+        usage: [
+            { label: 'Session (5h)', pct_text: '42%', tone: 'normal', bar_text: '████████░░░░░░░░░░░░', reset_text: 'Resets in 2h 30m (14:30)' },
+            { label: 'Weekly (7d)', pct_text: '76%', tone: 'mid', bar_text: '███████████████░░░░░', reset_text: 'Resets on Sat, 12:00' },
+        ],
+        extra: { pct_text: '23%', tone: 'normal', bar_text: '█████░░░░░░░░░░░░░░░', spent_text: '$4.60 / $20.00 spent' },
+        status: () => ({ last_success_time: now() - 12, next_poll_time: now() + 20, refreshing: false, error: null }),
+    },
+    minimal: {
+        profile: null,
+        usage: [
+            { label: 'Session (5h)', pct_text: '10%', tone: 'normal', bar_text: '██░░░░░░░░░░░░░░░░░░', reset_text: 'Resets in 4h 50m (17:00)' },
+        ],
+        extra: null,
+        status: () => ({ last_success_time: now() - 90, next_poll_time: now() + 90, refreshing: false, error: null }),
+    },
+    danger: {
+        profile: { email: 'user@example.com', plan: 'Max' },
+        usage: [
+            { label: 'Session (5h)', pct_text: '101%', tone: 'danger', bar_text: '████████████████████', reset_text: 'Resets in 12m (12:12)' },
+            { label: 'Weekly (7d)', pct_text: '89%', tone: 'warn', bar_text: '██████████████████░░', reset_text: 'Resets tomorrow, 08:00' },
+        ],
+        extra: { pct_text: '95%', tone: 'warn', bar_text: '███████████████████░', spent_text: '$19.00 / $20.00 spent' },
+        status: () => ({ last_success_time: now() - 300, next_poll_time: now() + 30, refreshing: false, error: 'Could not connect to Anthropic API.' }),
+    },
+    refreshing: {
+        profile: { email: 'user@example.com', plan: 'Max (Team)' },
+        usage: [
+            { label: 'Session (5h)', pct_text: '42%', tone: 'normal', bar_text: '████████░░░░░░░░░░░░', reset_text: 'Resets in 2h 30m (14:30)' },
+            { label: 'Weekly (7d)', pct_text: '51%', tone: 'mid', bar_text: '██████████░░░░░░░░░░', reset_text: 'Resets on Sat, 12:00' },
+        ],
+        extra: null,
+        status: () => ({ last_success_time: now() - 180, next_poll_time: null, refreshing: true, error: null }),
+    },
+    loading: {
+        profile: null,
+        usage: [],
+        extra: null,
+        status: { text: 'Refreshing...', is_error: false, refreshing: true },
+    },
+};
+
+const iframe = document.getElementById('popup');
+const popupWindow = () => iframe.contentWindow;
+const now = () => Date.now() / 1000;
+let previewPinned = false;
+
+function resolvePreset(name) {
+    const preset = PRESETS[name];
+    const status = typeof preset.status === 'function' ? preset.status() : preset.status;
+    return { ...structuredClone({ ...preset, status: null }), status };
+}
+
+function applyPreset(name) {
+    popupWindow().init({
+        colors: COLORS,
+        t: T,
+        app_version: '1.13.0',
+        window: { pinned: false },
+        data: resolvePreset(name),
+    });
+}
+
+function loadPreset(name) {
+    location.hash = name;
+    popupWindow().updateData(resolvePreset(name));
+}
+
+function randomize() {
+    location.hash = 'randomize';
+    const data = resolvePreset('full');
+    for (const entry of data.usage) {
+        const percent = Math.round(Math.random() * 120);
+        entry.pct_text = `${percent}%`;
+        entry.bar_text = buildBar(percent);
+        entry.tone = toneFor(percent);
+    }
+    if (data.extra) {
+        const percent = Math.round(Math.random() * 120);
+        data.extra.pct_text = `${percent}%`;
+        data.extra.bar_text = buildBar(percent);
+        data.extra.tone = toneFor(percent);
+    }
+    popupWindow().updateData(data);
+}
+
+function toneFor(percent) {
+    if (percent >= 100) return 'danger';
+    if (percent >= 80) return 'warn';
+    if (percent >= 50) return 'mid';
+    return 'normal';
+}
+
+function buildBar(percent) {
+    const size = 20;
+    const filled = Math.max(0, Math.min(size, Math.round(Math.min(percent, 100) / 100 * size)));
+    return '█'.repeat(filled) + '░'.repeat(size - filled);
+}
+
+iframe.addEventListener('load', () => {
+    popupWindow().pywebview = {
+        api: {
+            hide_window() {},
+            toggle_pin() {
+                previewPinned = !previewPinned;
+                return Promise.resolve({ pinned: previewPinned });
+            },
+            report_height(height) {
+                iframe.style.height = `${height}px`;
+                iframe.style.visibility = 'visible';
+            },
+        },
+    };
+
+    applyPreset(location.hash.slice(1) || 'full');
+}, { once: true });
+</script>
+</body>
+</html>

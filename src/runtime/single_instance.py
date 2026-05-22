@@ -14,8 +14,8 @@ import ctypes.wintypes
 import os
 import struct
 
-from . import __version__
-from .i18n import T
+from src import __version__
+from src.presentation.i18n import T
 
 __all__ = ['ensure_single_instance', 'release_instance_lock']
 

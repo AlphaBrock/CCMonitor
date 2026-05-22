@@ -1,92 +1,95 @@
 # Usage Monitor for Claude
 
-[![Feature Ideas](https://img.shields.io/badge/Feature_Ideas-Vote_%26_Discuss-blue?style=for-the-badge&logo=github)](https://github.com/jens-duttke/usage-monitor-for-claude/discussions/categories/ideas)
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4?style=for-the-badge&logo=github)](https://github.com/sponsors/jens-duttke)
+**简体中文**|[English](README.md) 
 
-**Monitor your Claude rate limits in real time - right from your Windows system tray.**
+[![Feature Ideas](https://img.shields.io/badge/Feature_Ideas-Vote_%26_Discuss-blue?style=for-the-badge&logo=github)](https://github.com/AlphaBrock/CCMonitor/discussions/categories/ideas)
 
-A native Windows tray app that shows your Claude usage at a glance - lightweight, portable, and fully auditable. Rate limits are shared across claude.ai, Claude Code, Claude Code Cowork, and IDE extensions for VS Code and JetBrains - always know how much of your session and weekly limits (Sonnet, Opus, Cowork, and any future quota types) you have left.
+**实时监控 Claude 速率限制 - 直接在 Windows 系统托盘中查看。**
 
-![Detail popup showing account info and usage bars](screenshot.png)
+一款原生 Windows 托盘应用，让您一目了然地掌握 Claude 用量 - 轻量、免安装、代码完全可审计。速率限制在 claude.ai、Claude Code、Claude Code Cowork 以及 VS Code 和 JetBrains IDE 扩展之间共享 - 随时了解会话和周限额剩余量。
 
-## Features
+![桌面详情窗口展示账户信息和用量进度条](assets/screenshot_CN.png)
 
-- **Portable** - single EXE (~12.5 MB), no installation, no Electron, no runtime required. Download, place anywhere, run. To uninstall, delete the file
-- **Zero configuration** - authenticates through your existing Claude Code login, no API key or manual token entry needed
-- **Live tray icon** with two [configurable](docs/configuration.md#tray-icon-bars) progress bars (session + weekly by default), [configurable tooltip](docs/configuration.md#tooltip-fields), percentage display, and theme-aware colors for light and dark taskbars
-- **Detail popup** (left-click) showing account info, dynamically detected usage bars for all active quota types (Session, Weekly, Sonnet, Opus, Cowork, and any new quotas Anthropic adds) with [configurable field selection](docs/configuration.md#popup-fields), extra usage, reset countdowns, and a stale-data indicator when values may be outdated
-- **Claude Code versions** - the popup shows which version is installed in each environment (native CLI, VS Code, Cursor, Windsurf), making it easy to spot when your IDE extension is ahead of or behind the CLI
-- **Smart alerts** - configurable threshold notifications per quota type, with time-aware mode that only alerts when usage outpaces elapsed time. Reset notifications when a nearly exhausted quota refills
-- **[Event commands](docs/event-commands.md)** - run a custom shell command when a quota resets, a usage threshold is crossed, or the app starts up. Send push notifications to your phone, resume an AI agent, start a fresh 5-hour session automatically, play an alert sound, or trigger any custom workflow
-- **Time marker** on each bar showing elapsed time in the current period, so you can instantly see whether your usage is ahead of or behind the clock
-- **Automatic token refresh** - when the OAuth session expires, runs `claude update` in the background to renew the token without user intervention. If a CLI update is installed, shows a notification
-- **Adaptive polling** - speeds up during active usage, pauses when the computer is idle or locked, aligns to imminent quota resets, and backs off on rate-limit errors
-- **13 languages** (English, German, French, Spanish, Portuguese, Italian, Japanese, Korean, Hindi, Indonesian, Chinese Simplified, Chinese Traditional, Ukrainian) - auto-detected from your Windows display language, with optional manual override via the `language` setting
-- **[Customizable](docs/configuration.md)** - optionally override polling intervals, colors, alert thresholds, and more via a JSON settings file
+## 功能特性
 
----
-
-## Security & Transparency
-
-This tool handles your Claude Code OAuth token, so you should be able to verify it is safe. The codebase is deliberately structured for easy auditing:
-
-- **Single network destination** - communicates exclusively with `api.anthropic.com`, no other hosts
-- **Credentials stay local** - the OAuth token is used only in HTTP Authorization headers, never logged, stored elsewhere, or transmitted to third parties
-- **Read-only** - the app never writes files to disk
-- **No dynamic code execution** - no `eval()`, `exec()`, `compile()`, or dynamic imports
-- **No obfuscation** - no encoded strings, no hidden URLs, no minified logic
-- **Modular architecture** - small, focused modules with security-critical code (credentials, API calls) isolated in a single file ([`api.py`](usage_monitor_for_claude/api.py))
-- **Minimal runtime dependencies** - only four well-known packages: [requests](https://pypi.org/project/requests/), [Pillow](https://pypi.org/project/pillow/), [pystray](https://pypi.org/project/pystray/), [pywebview](https://pypi.org/project/pywebview/)
+- **免安装** - 单个 EXE 文件（约 12.5 MB），无需安装、无 Electron、无运行时依赖。下载后放在任意位置即可运行，卸载只需删除文件
+- **零配置** - 通过现有 Claude Code 登录自动认证，无需 API 密钥或手动输入令牌
+- **实时托盘图标** 带两个[可配置](docs/configuration.md#tray-icon-bars)进度条（默认显示会话和周用量），[可配置工具提示](docs/configuration.md#tooltip-fields)、百分比显示，以及适配浅色和深色任务栏的主题感知颜色
+- **桌面详情窗口** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。窗口聚焦于最常查看的两个配额（`5h` 和 `7d`），加上额外用量、重置倒计时以及数据过时指示器
+- **智能提醒** - 按配额类型可配置阈值通知，时间感知模式仅在使用超过已过时间比例时才提醒。接近耗尽的配额刷新后发送重置通知
+- **[事件命令](docs/event-commands.md)** - 在配额重置、使用达到阈值或应用启动时运行自定义 Shell 命令。可发送手机推送通知、恢复 AI 代理、自动开始新的 5 小时会话、播放提示音或触发任何自定义工作流
+- **自动令牌刷新** - OAuth 会话过期时后台运行 `claude update` 自动续期。如果安装了 CLI 更新会显示通知
+- **自适应轮询** - 活跃使用时加速轮询，电脑空闲或锁定时暂停，在配额即将重置时对齐轮询，速率限制错误时自动退避
+- **13 种语言**（英语、德语、法语、西班牙语、葡萄牙语、意大利语、日语、韩语、印地语、印尼语、简体中文、繁体中文、乌克兰语）- 自动检测 Windows 显示语言，或通过右键菜单手动切换
+- **[可自定义](docs/configuration.md)** - 可通过 JSON 设置文件覆盖轮询间隔、颜色、提醒阈值等
 
 ---
 
-## Requirements
+## 安全性与透明度
 
-- **Windows 10 or Windows 11** (64-bit)
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** installed and logged in (CLI, VS Code extension, or JetBrains plugin - any variant works). The app reads the OAuth token that Claude Code stores locally (`~/.claude/.credentials.json`). If you have `CLAUDE_CONFIG_DIR` set, the app uses that directory instead.
+本工具会处理您的 Claude Code OAuth 令牌，因此您应当能够验证其安全性。代码库刻意设计为易于审计：
+
+- **单一网络目标** - 仅与 `api.anthropic.com` 通信，不连接其他主机
+- **凭据本地保存** - OAuth 令牌仅用于 HTTP Authorization 头，从不记录日志、存储到其他位置或传输给第三方
+- **只读** - 应用从不向磁盘写入文件
+- **无动态代码执行** - 不使用 `eval()`、`exec()`、`compile()` 或动态导入
+- **无混淆** - 无编码字符串、无隐藏 URL、无压缩逻辑
+- **模块化架构** - 小而专注的模块，安全关键代码（凭据、API 调用）隔离在单个文件中（[`api.py`](src/integrations/api.py)）
+- **最小运行时依赖** - 仅四个知名包：[requests](https://pypi.org/project/requests/)、[Pillow](https://pypi.org/project/pillow/)、[pystray](https://pypi.org/project/pystray/)、[pywebview](https://pypi.org/project/pywebview/)
+
+---
+
+## 系统要求
+
+- **Windows 10 或 Windows 11**（64 位）
+- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** 已安装并登录（CLI、VS Code 扩展或 JetBrains 插件均可）。应用读取 Claude Code 本地存储的 OAuth 令牌（`~/.claude/.credentials.json`）。如果设置了 `CLAUDE_CONFIG_DIR`，应用使用该目录。
 
 > [!TIP]
-> If the token expires, the app automatically runs `claude update` to refresh it. If the token is missing entirely, the app shows a notification and a "!" icon - log in to Claude Code and the monitor picks it up automatically.
+> 令牌过期时，应用会自动运行 `claude update` 刷新令牌。如果令牌完全缺失，应用会显示通知和 "!" 图标 - 登录 Claude Code 后监控器会自动检测到。
 
 ---
 
-## Quick Start
+## 快速开始
 
-**No Python required.** Download the latest [**UsageMonitorForClaude.exe**](https://github.com/jens-duttke/usage-monitor-for-claude/releases/latest), place it wherever you like, and run it. To remove, disable "Start with Windows" in the context menu first (if enabled), then delete the file.
+**无需安装 Python。** 下载最新的 [**UsageMonitorForClaude.exe**](https://github.com/AlphaBrock/CCMonitor/releases/latest)，放在任意位置运行即可。要卸载，先在右键菜单中禁用「开机启动」（如已启用），然后删除文件。
 
 ---
 
-## How to Use
+## 使用方法
 
-| Action | What happens |
+| 操作 | 说明 |
 |---|---|
-| **Hover** over the tray icon | Tooltip shows 5h and 7d usage percentages with reset times |
-| **Left-click** the tray icon | Opens the detail popup with account info and all usage bars |
-| **Right-click** the tray icon | Context menu: open popup, autostart toggle, test event commands, restart, GitHub link, or quit |
-| **Escape** or click outside | Closes the detail popup |
+| **悬停**在托盘图标上 | 工具提示显示 5h 和 7d 用量百分比及重置时间 |
+| **应用启动** | 桌面详情窗口立即在托盘附近打开 |
+| **左键点击**托盘图标 | 显示桌面详情窗口并置顶 |
+| **右键点击**托盘图标 | 右键菜单：显示窗口、开机启动、语言切换、检查更新、测试事件命令、重新启动、GitHub 链接、退出 |
+| **PIN** 按钮 | 保持桌面窗口始终置顶 |
+| **X** 按钮或 **Escape** | 隐藏桌面窗口到托盘 |
 
-### Tray icon not visible?
+### 托盘图标不可见？
 
-Windows may hide new tray icons by default. To keep the icon always visible:
+Windows 可能默认隐藏新的托盘图标。要保持图标始终可见：
 
-1. Right-click the **taskbar** → **Taskbar settings**
-2. Expand **Other system tray icons** (Win 11) or **Select which icons appear on the taskbar** (Win 10)
-3. Toggle **UsageMonitorForClaude** to **On**
+1. 右键点击**任务栏** -> **任务栏设置**
+2. 展开**其他系统托盘图标**（Win 11）或**选择哪些图标显示在任务栏上**（Win 10）
+3. 将 **UsageMonitorForClaude** 切换为**开**
 
-### Reading the progress bars
+### 进度条说明
 
-Each bar in the detail popup has up to four visual elements:
+桌面窗口以固定宽度 `█░` 文字条渲染用量：
 
-1. **Blue fill** - how much of the limit you have used
-2. **Day dividers** - subtle gaps at local midnight boundaries, visually grouping usage into day segments (visible on the weekly bar)
-3. **White vertical line** - how much *time* has passed in the current period. The fill turns **red** when it passes this marker, warning that you may hit the limit before the period resets.
-4. **Reset text** - when the limit resets, shown as a countdown with clock time
+1. **蓝色**（`0-49%`）- 低用量
+2. **绿色**（`50-79%`）- 中等用量
+3. **橙色/红色**（`80-99%`）- 高用量
+4. **深红色**（`100%+`）- 配额耗尽
+
+每行还显示精确百分比和重置倒计时文字。
 
 ---
 
-## Configuration
+## 配置
 
-All settings work out of the box - no configuration file is needed. To customize behavior, create a file called `usage-monitor-settings.json` with only the keys you want to change:
+所有设置开箱即用 - 无需配置文件。要自定义行为，创建 `usage-monitor-settings.json` 文件，只需包含要更改的键：
 
 ```json
 {
@@ -96,118 +99,127 @@ All settings work out of the box - no configuration file is needed. To customize
 }
 ```
 
-The app searches for this file in two locations (first match wins):
+应用在两个位置搜索此文件（首个匹配生效）：
 
-1. **Next to the EXE** (or project root when running from source)
-2. **`~/.claude/usage-monitor-settings.json`** (or `$CLAUDE_CONFIG_DIR/usage-monitor-settings.json` if set)
+1. **EXE 旁边**（或从源码运行时的项目根目录）
+2. **`~/.claude/usage-monitor-settings.json`**（如设置了 `$CLAUDE_CONFIG_DIR` 则为 `$CLAUDE_CONFIG_DIR/usage-monitor-settings.json`）
 
-The app never creates or modifies this file. See [Configuration](docs/configuration.md) for all available settings (alert thresholds, polling intervals, colors, language, and more).
+应用从不创建或修改此文件。详见 [Configuration](docs/configuration.md) 了解所有可用设置（提醒阈值、轮询间隔、颜色、语言等）。
 
 ---
 
-## Building from Source
+## 从源码构建
 
 <details>
-<summary>For developers who want to build the EXE themselves</summary>
+<summary>面向想要自行构建 EXE 的开发者</summary>
 
-### Prerequisites
+### 前提条件
 
 - Python 3.10+
 - pip
 
-### Setup
+### 设置
 
 ```bash
-git clone https://github.com/jens-duttke/usage-monitor-for-claude.git
-cd usage-monitor-for-claude
+git clone https://github.com/AlphaBrock/CCMonitor.git
+cd CCMonitor
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Run
+### 运行
 
 ```bash
-python -m usage_monitor_for_claude
+python main.py
 ```
 
-### Build EXE
+也可以使用包入口：
 
 ```bash
-python build.py
+python -m src
 ```
 
-Produces `dist/UsageMonitorForClaude.exe` (~12.5 MB), a single-file executable that bundles Python and all dependencies.
-
-### Popup UI Development
-
-The popup UI lives in [`usage_monitor_for_claude/popup/`](usage_monitor_for_claude/popup/) as separate HTML, CSS, and JS files. To preview and iterate on the UI without running the full app:
+### 构建 EXE
 
 ```bash
-start http://localhost:8080/dev.html && python -m http.server 8080 -d usage_monitor_for_claude/popup
+python scripts/build.py
 ```
 
-This starts a local server and opens the dev preview in your default browser. Use the buttons to switch between data presets (full, minimal, error, loading) and test CSS/JS changes with instant feedback.
+生成 `dist/UsageMonitorForClaude.exe`（约 12.5 MB），单文件可执行程序包含 Python 和所有依赖。
 
-### Create a Release
+### 桌面窗口 UI 开发
 
-1. Update dependencies: `pip install --upgrade -r requirements.txt`
-2. Update `__version__` in [`usage_monitor_for_claude/__init__.py`](usage_monitor_for_claude/__init__.py) and the version in [`version_info.py`](version_info.py) (`filevers`, `prodvers`, `FileVersion`, `ProductVersion`)
-3. Update `_FALLBACK_USER_AGENT` in [`usage_monitor_for_claude/api.py`](usage_monitor_for_claude/api.py) to the current Claude Code version
-4. In [`CHANGELOG.md`](CHANGELOG.md), rename `## [Unreleased]` to `## [1.x.x] - YYYY-MM-DD` and add a fresh empty `## [Unreleased]` section above it
-5. Run the test suite: `python -m unittest discover -s tests`
-6. Smoke test: `python -m usage_monitor_for_claude` - verify tray icon, popup, and settings
-7. Build the EXE with `python build.py`
-8. Smoke test: `dist\UsageMonitorForClaude.exe` - verify tray icon, popup, and settings
-9. Stage the changes from steps 2 to 4
-10. Commit, tag, push, and publish:
+桌面窗口 UI 位于 [`src/ui/popup/`](src/ui/popup/) 目录，包含独立的 HTML、CSS 和 JS 文件。要在不运行完整应用的情况下预览和迭代 UI：
+
+```bash
+start http://localhost:8080/dev.html && python -m http.server 8080 -d src/ui/popup
+```
+
+这会启动本地服务器并在默认浏览器中打开开发预览。使用按钮在数据预设（完整、最小、错误、加载中）之间切换，即时查看 CSS/JS 修改效果。
+
+### 创建发布版本
+
+1. 更新依赖：`pip install --upgrade -r requirements.txt`
+2. 更新 [`src/__init__.py`](src/__init__.py) 中的 `__version__` 和 [`packaging/version_info.py`](packaging/version_info.py) 中的版本号（`filevers`、`prodvers`、`FileVersion`、`ProductVersion`）
+3. 更新 [`src/integrations/api.py`](src/integrations/api.py) 中的 `_FALLBACK_USER_AGENT` 为当前 Claude Code 版本
+4. 在 [`CHANGELOG.md`](CHANGELOG.md) 中将 `## [Unreleased]` 重命名为 `## [1.x.x] - YYYY-MM-DD`，并在其上方添加新的空 `## [Unreleased]` 段落
+5. 运行测试套件：`python -m unittest discover -s tests`
+6. 冒烟测试：`python -m src` - 验证托盘图标、桌面窗口和设置
+7. 使用 `python scripts/build.py` 构建 EXE
+8. 冒烟测试：`dist\UsageMonitorForClaude.exe` - 验证托盘图标、桌面窗口和设置
+9. 暂存步骤 2 到 4 的更改
+10. 提交并推送发布准备
+11. 创建并推送语义化标签（`X.Y.Z`）以触发发布工作流：
 
    ```bash
-   git commit -m "Release v1.x.x"
-   git tag v1.x.x
-   git push origin main v1.x.x
-   gh release create v1.x.x dist/UsageMonitorForClaude.exe --title "v1.x.x" --notes "<release notes from CHANGELOG.md, followed by a [README for this version](https://github.com/jens-duttke/usage-monitor-for-claude/blob/v1.x.x/README.md) link>"
+   git commit -m "Release 1.x.x"
+   git push origin main
+   git tag 1.x.x
+   git push origin 1.x.x
    ```
 
+GitHub Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/release.yml) 会运行测试、构建 EXE、提取对应的 `CHANGELOG.md` 内容并自动发布 GitHub Release。
+
 </details>
 
 ---
 
-## Contributing
+## 贡献
 
-Contributions are welcome - whether it's bug reports, feature ideas, or pull requests. [Open an issue](https://github.com/jens-duttke/usage-monitor-for-claude/issues) to report bugs or ask questions. For feature ideas, browse and vote on existing proposals or submit your own in [Ideas](https://github.com/jens-duttke/usage-monitor-for-claude/discussions/categories/ideas).
+欢迎贡献 - 无论是 Bug 报告、功能建议还是 Pull Request。[提交 Issue](https://github.com/AlphaBrock/CCMonitor/issues) 报告 Bug 或提问。功能建议请浏览并投票已有提案或在 [Ideas](https://github.com/AlphaBrock/CCMonitor/discussions/categories/ideas) 提交新想法。
 
 <details>
-<summary>For developers who want to contribute to the project</summary>
+<summary>面向想要参与项目的开发者</summary>
 
-This project is developed with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). The [`.claude/CLAUDE.md`](.claude/CLAUDE.md) file contains all project conventions, coding standards, and architectural guidelines - Claude Code applies these automatically during development.
+本项目使用 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 开发。[`.claude/CLAUDE.md`](.claude/CLAUDE.md) 文件包含所有项目规范、编码标准和架构指南 - Claude Code 在开发过程中会自动遵循这些规范。
 
-### Workflow
+### 工作流程
 
-1. Read `.claude/CLAUDE.md` to understand the project conventions
-2. Implement your changes with Claude Code - it will follow the guidelines automatically
-3. Before committing, run the `/review` slash command to perform a systematic quality review of all staged changes (code, tests, documentation)
-4. Stage remaining fixes if any, then run `/commit-message` to generate a properly formatted commit message
+1. 阅读 `.claude/CLAUDE.md` 了解项目规范
+2. 使用 Claude Code 实现更改 - 它会自动遵循指南
+3. 提交前运行 `/review` 斜杠命令，对所有暂存更改进行系统化质量审查（代码、测试、文档）
+4. 如有修复则暂存，然后运行 `/commit-message` 生成格式规范的提交信息
 
-### Adding features
+### 添加功能
 
-New features should follow the existing architecture. Key points from the guidelines:
+新功能应遵循现有架构。指南要点：
 
-- Security-critical code (credentials, API calls) stays isolated in [`api.py`](usage_monitor_for_claude/api.py)
-- All user-facing changes need updates in [`CHANGELOG.md`](CHANGELOG.md), [`README.md`](README.md), and [`docs/configuration.md`](docs/configuration.md) where applicable
-- Tests are required - run `python -m unittest discover -s tests` before committing
-- The app is read-only and must never write files to disk
+- 安全关键代码（凭据、API 调用）隔离在 [`api.py`](src/integrations/api.py) 中
+- 所有面向用户的更改需要更新 [`CHANGELOG.md`](CHANGELOG.md)、[`README.md`](README.md) 和 [`docs/configuration.md`](docs/configuration.md)（如适用）
+- 测试是必需的 - 提交前运行 `python -m unittest discover -s tests`
+- 应用是只读的，从不向磁盘写入文件
 
 </details>
 
 ---
 
-## License
+## 许可证
 
 MIT
 
 ---
 
-## Disclaimer
+## 免责声明
 
-This is an independent, community-built project. It is **not** created, endorsed, or officially supported by [Anthropic](https://www.anthropic.com/). "Claude" and "Anthropic" are trademarks of Anthropic, PBC. Use of these names is solely for descriptive purposes to indicate compatibility.
+这是一个独立的社区项目。它**不是**由 [Anthropic](https://www.anthropic.com/) 创建、认可或官方支持的。"Claude" 和 "Anthropic" 是 Anthropic, PBC 的商标。使用这些名称仅用于描述性目的以表明兼容性。

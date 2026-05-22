@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag format
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_name }}' -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Unsupported tag format: ${{ github.ref_name }}"
+          }
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Run test suite
+        shell: pwsh
+        run: python -m unittest discover -s tests
+
+      - name: Build executable
+        shell: pwsh
+        run: python scripts/build.py
+
+      - name: Extract release notes
+        shell: pwsh
+        run: |
+          python scripts/extract_release_notes.py CHANGELOG.md ${{ github.ref_name }} | Out-File -FilePath release_notes.md -Encoding utf8
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: release_notes.md
+          files: dist/UsageMonitorForClaude.exe

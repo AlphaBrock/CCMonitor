@@ -13,7 +13,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from usage_monitor_for_claude.i18n import LOCALE_DIR, detect_lang_code, load_translations
+from src.presentation.i18n import LOCALE_DIR, _system_lang, detect_lang_code, load_translations
 
 MOCK_LOCALE_FILES = ['en.json', 'de.json', 'es.json', 'fr.json', 'ja.json', 'pt-BR.json', 'uk.json', 'zh-CN.json', 'zh-TW.json']
 
@@ -44,7 +44,7 @@ def _mock_normalize(locale_string):
 # detect_lang_code
 # ---------------------------------------------------------------------------
 
-@patch('usage_monitor_for_claude.i18n.locale.normalize', side_effect=_mock_normalize)
+@patch('src.presentation.i18n.locale.normalize', side_effect=_mock_normalize)
 class TestDetectLangCode(unittest.TestCase):
     """Tests for detect_lang_code()."""
 
@@ -53,7 +53,7 @@ class TestDetectLangCode(unittest.TestCase):
         self._locale_dir = Path(self._tmp.name)
         for name in MOCK_LOCALE_FILES:
             (self._locale_dir / name).write_text('{}')
-        self._patch_dir = patch('usage_monitor_for_claude.i18n.LOCALE_DIR', self._locale_dir)
+        self._patch_dir = patch('src.presentation.i18n.LOCALE_DIR', self._locale_dir)
         self._patch_dir.start()
 
     def tearDown(self):
@@ -112,6 +112,24 @@ class TestDetectLangCode(unittest.TestCase):
     def test_empty_string_falls_back_to_en(self, _mock_norm):
         self.assertEqual(detect_lang_code(''), 'en')
 
+    def test_zh_CN_bcp47_tag(self, _mock_norm):
+        """BCP 47 tag with hyphen resolves to regional file."""
+        self.assertEqual(detect_lang_code('zh-CN'), 'zh-CN')
+
+    def test_zh_TW_bcp47_tag(self, _mock_norm):
+        self.assertEqual(detect_lang_code('zh-TW'), 'zh-TW')
+
+    def test_pt_BR_bcp47_tag(self, _mock_norm):
+        """BCP 47 tag with matching regional file returns region-specific code."""
+        self.assertEqual(detect_lang_code('pt-BR'), 'pt-BR')
+
+    def test_de_DE_bcp47_tag(self, _mock_norm):
+        """BCP 47 tag without regional file falls back to base."""
+        self.assertEqual(detect_lang_code('de-DE'), 'de')
+
+    def test_en_US_bcp47_tag(self, _mock_norm):
+        self.assertEqual(detect_lang_code('en-US'), 'en')
+
 
 # ---------------------------------------------------------------------------
 # load_translations
@@ -120,34 +138,52 @@ class TestDetectLangCode(unittest.TestCase):
 class TestLoadTranslations(unittest.TestCase):
     """Tests for load_translations()."""
 
-    @patch('usage_monitor_for_claude.settings.LANGUAGE', '')
-    @patch('usage_monitor_for_claude.i18n.locale.normalize', side_effect=_mock_normalize)
-    @patch('usage_monitor_for_claude.i18n.locale.getlocale', return_value=('de_DE', 'UTF-8'))
-    def test_loads_detected_locale(self, _mock_get, _mock_norm):
+    @patch('src.presentation.settings.LANGUAGE', '')
+    @patch('src.presentation.i18n.locale.normalize', side_effect=_mock_normalize)
+    @patch('src.presentation.i18n._system_lang', return_value='de-DE')
+    def test_loads_detected_locale(self, _mock_sys, _mock_norm):
         """Loads the JSON file matching the detected system locale."""
         with TemporaryDirectory() as tmp:
             locale_dir = Path(tmp)
             (locale_dir / 'en.json').write_text('{"title": "English"}')
             (locale_dir / 'de.json').write_text('{"title": "Deutsch"}')
 
-            with patch('usage_monitor_for_claude.i18n.LOCALE_DIR', locale_dir):
-                result = load_translations()
+            with patch('src.presentation.i18n.LOCALE_DIR', locale_dir):
+                translations, lang_code = load_translations()
 
-        self.assertEqual(result['title'], 'Deutsch')
+        self.assertEqual(translations['title'], 'Deutsch')
+        self.assertEqual(lang_code, 'de')
 
-    @patch('usage_monitor_for_claude.settings.LANGUAGE', '')
-    @patch('usage_monitor_for_claude.i18n.locale.normalize', side_effect=_mock_normalize)
-    @patch('usage_monitor_for_claude.i18n.locale.getlocale', return_value=(None, None))
-    def test_none_locale_falls_back_to_english(self, _mock_get, _mock_norm):
-        """None from getlocale() falls back to English."""
+    @patch('src.presentation.settings.LANGUAGE', '')
+    @patch('src.presentation.i18n.locale.normalize', side_effect=_mock_normalize)
+    @patch('src.presentation.i18n._system_lang', return_value='')
+    def test_empty_lang_falls_back_to_english(self, _mock_sys, _mock_norm):
+        """Empty string from _system_lang() falls back to English."""
         with TemporaryDirectory() as tmp:
             locale_dir = Path(tmp)
             (locale_dir / 'en.json').write_text('{"title": "English"}')
 
-            with patch('usage_monitor_for_claude.i18n.LOCALE_DIR', locale_dir):
-                result = load_translations()
+            with patch('src.presentation.i18n.LOCALE_DIR', locale_dir):
+                translations, lang_code = load_translations()
 
-        self.assertEqual(result['title'], 'English')
+        self.assertEqual(translations['title'], 'English')
+        self.assertEqual(lang_code, 'en')
+
+    @patch('src.presentation.settings.LANGUAGE', '')
+    @patch('src.presentation.i18n.locale.normalize', side_effect=_mock_normalize)
+    @patch('src.presentation.i18n._system_lang', return_value='zh-CN')
+    def test_loads_regional_locale_from_bcp47(self, _mock_sys, _mock_norm):
+        """BCP 47 tag from Win32 API resolves to regional locale file."""
+        with TemporaryDirectory() as tmp:
+            locale_dir = Path(tmp)
+            (locale_dir / 'en.json').write_text('{"title": "English"}')
+            (locale_dir / 'zh-CN.json').write_text('{"title": "Chinese"}')
+
+            with patch('src.presentation.i18n.LOCALE_DIR', locale_dir):
+                translations, lang_code = load_translations()
+
+        self.assertEqual(translations['title'], 'Chinese')
+        self.assertEqual(lang_code, 'zh-CN')
 
     def test_language_setting_overrides_locale(self):
         """LANGUAGE setting bypasses locale detection entirely."""
@@ -156,26 +192,28 @@ class TestLoadTranslations(unittest.TestCase):
             (locale_dir / 'en.json').write_text('{"title": "English"}')
             (locale_dir / 'ja.json').write_text('{"title": "Japanese"}')
 
-            with patch('usage_monitor_for_claude.settings.LANGUAGE', 'ja'), \
-                 patch('usage_monitor_for_claude.i18n.LOCALE_DIR', locale_dir):
-                result = load_translations()
+            with patch('src.presentation.settings.LANGUAGE', 'ja'), \
+                 patch('src.presentation.i18n.LOCALE_DIR', locale_dir):
+                translations, lang_code = load_translations()
 
-        self.assertEqual(result['title'], 'Japanese')
+        self.assertEqual(translations['title'], 'Japanese')
+        self.assertEqual(lang_code, 'ja')
 
-    @patch('usage_monitor_for_claude.settings.LANGUAGE', 'xx')
-    @patch('usage_monitor_for_claude.i18n.locale.normalize', side_effect=_mock_normalize)
-    @patch('usage_monitor_for_claude.i18n.locale.getlocale', return_value=('de_DE', 'UTF-8'))
-    def test_invalid_language_setting_falls_back_to_locale(self, _mock_get, _mock_norm):
+    @patch('src.presentation.settings.LANGUAGE', 'xx')
+    @patch('src.presentation.i18n.locale.normalize', side_effect=_mock_normalize)
+    @patch('src.presentation.i18n._system_lang', return_value='de-DE')
+    def test_invalid_language_setting_falls_back_to_locale(self, _mock_sys, _mock_norm):
         """Invalid LANGUAGE setting falls back to locale detection."""
         with TemporaryDirectory() as tmp:
             locale_dir = Path(tmp)
             (locale_dir / 'en.json').write_text('{"title": "English"}')
             (locale_dir / 'de.json').write_text('{"title": "Deutsch"}')
 
-            with patch('usage_monitor_for_claude.i18n.LOCALE_DIR', locale_dir):
-                result = load_translations()
+            with patch('src.presentation.i18n.LOCALE_DIR', locale_dir):
+                translations, lang_code = load_translations()
 
-        self.assertEqual(result['title'], 'Deutsch')
+        self.assertEqual(translations['title'], 'Deutsch')
+        self.assertEqual(lang_code, 'de')
 
 
 # ---------------------------------------------------------------------------
@@ -252,6 +290,35 @@ class TestLocaleConsistency(unittest.TestCase):
                     f'{lang}.json key "{key}": expected {type(self.reference[key]).__name__}, '
                     f'got {type(data[key]).__name__}',
                 )
+
+
+# ---------------------------------------------------------------------------
+# _system_lang
+# ---------------------------------------------------------------------------
+
+class TestSystemLang(unittest.TestCase):
+    """Tests for _system_lang()."""
+
+    @patch('src.presentation.i18n.ctypes')
+    def test_returns_win32_locale_name(self, mock_ctypes):
+        """Returns the BCP 47 tag from GetUserDefaultLocaleName."""
+        mock_ctypes.create_unicode_buffer.return_value.value = 'zh-CN'
+        mock_ctypes.windll.kernel32.GetUserDefaultLocaleName.return_value = 5
+        self.assertEqual(_system_lang(), 'zh-CN')
+
+    @patch('src.presentation.i18n.locale.getlocale', return_value=('de_DE', 'UTF-8'))
+    @patch('src.presentation.i18n.ctypes')
+    def test_falls_back_to_getlocale_on_api_failure(self, mock_ctypes, _mock_get):
+        """Falls back to locale.getlocale() when Win32 API returns 0."""
+        mock_ctypes.windll.kernel32.GetUserDefaultLocaleName.return_value = 0
+        self.assertEqual(_system_lang(), 'de_DE')
+
+    @patch('src.presentation.i18n.locale.getlocale', return_value=(None, None))
+    @patch('src.presentation.i18n.ctypes')
+    def test_returns_empty_when_both_fail(self, mock_ctypes, _mock_get):
+        """Returns empty string when Win32 API fails and getlocale() returns None."""
+        mock_ctypes.windll.kernel32.GetUserDefaultLocaleName.return_value = 0
+        self.assertEqual(_system_lang(), '')
 
 
 if __name__ == '__main__':

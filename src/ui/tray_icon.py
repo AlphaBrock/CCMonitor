@@ -14,7 +14,7 @@ from typing import Callable
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .settings import ICON_DARK, ICON_LIGHT
+from src.presentation.settings import ICON_DARK, ICON_LIGHT
 
 __all__ = ['load_font', 'taskbar_uses_light_theme', 'watch_theme_change', 'create_icon_image', 'create_status_image']
 

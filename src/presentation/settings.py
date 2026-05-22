@@ -2,17 +2,7 @@
 Settings
 =========
 
-Centralizes all user-tunable constants.  Structural constants (API URLs,
-registry keys, file paths) remain in their respective modules.
-
-Loads an optional ``usage-monitor-settings.json`` to let users override
-any constant.  Search order:
-
-1. Next to the executable (frozen) or project root (source)
-2. ``$CLAUDE_CONFIG_DIR/usage-monitor-settings.json`` (if set and different from ``~/.claude/``)
-3. ``~/.claude/usage-monitor-settings.json``
-
-The app never creates this file - users place it manually.
+User-overridable configuration and default theme constants.
 """
 from __future__ import annotations
 
@@ -25,7 +15,7 @@ from pathlib import Path
 
 __all__ = [
     'ALERT_TIME_AWARE', 'ALERT_TIME_AWARE_BELOW',
-    'BAR_BG', 'BAR_FG', 'BAR_FG_WARN', 'BAR_MARKER', 'BG',
+    'BAR_BG', 'BAR_FG', 'BAR_FG_DANGER', 'BAR_FG_MID', 'BAR_FG_WARN', 'BAR_MARKER', 'BG',
     'CURRENCY_SYMBOL',
     'FG', 'FG_DIM', 'FG_HEADING', 'FG_LINK',
     'ICON_DARK', 'ICON_FIELDS', 'ICON_LIGHT', 'IDLE_PAUSE',
@@ -33,7 +23,7 @@ __all__ = [
     'ON_RESET_COMMAND', 'ON_STARTUP_COMMAND', 'ON_THRESHOLD_COMMAND',
     'POLL_ERROR', 'POLL_FAST', 'POLL_FAST_EXTRA', 'POLL_INTERVAL',
     'POPUP_FIELDS', 'SETTINGS_FILENAME', 'TOOLTIP_FIELDS',
-    'get_alert_thresholds',
+    'get_alert_thresholds', 'save_language_setting',
 ]
 
 SETTINGS_FILENAME = 'usage-monitor-settings.json'
@@ -46,7 +36,11 @@ _NUMERIC_BOUNDS: dict[str, int] = {
     'max_backoff': 1,
     'idle_pause': 0,
 }
-_COLOR_KEYS = frozenset({'bg', 'fg', 'fg_dim', 'fg_heading', 'fg_link', 'bar_bg', 'bar_fg', 'bar_fg_warn', 'bar_divider', 'bar_marker'})
+_COLOR_KEYS = frozenset({
+    'bg', 'fg', 'fg_dim', 'fg_heading', 'fg_link',
+    'bar_bg', 'bar_fg', 'bar_fg_mid', 'bar_fg_warn', 'bar_fg_danger',
+    'bar_divider', 'bar_marker',
+})
 _ICON_KEYS = frozenset({'icon_light', 'icon_dark'})
 _THRESHOLD_KEY_PREFIX = 'alert_thresholds_'
 _PERCENT_KEYS = frozenset({'alert_time_aware_below'})
@@ -58,12 +52,17 @@ _WILDCARD_STRING_LIST_KEYS = frozenset({'popup_fields'})
 _VALID_BAR_MODES = frozenset({'utilization', 'overage'})
 
 
+_SETTINGS_PATH: Path | None = None
+
+
 def _load_settings() -> dict:
     """Read the first ``usage-monitor-settings.json`` found, or return ``{}``."""
+    global _SETTINGS_PATH
+
     if getattr(sys, 'frozen', False):
         app_dir = Path(sys.executable).parent
     else:
-        app_dir = Path(__file__).resolve().parent.parent
+        app_dir = Path(__file__).resolve().parents[2]
 
     home_claude = Path.home() / '.claude'
     custom_config = Path(os.environ['CLAUDE_CONFIG_DIR']) if os.environ.get('CLAUDE_CONFIG_DIR') else None
@@ -75,6 +74,7 @@ def _load_settings() -> dict:
 
     for path in search_paths:
         if path.is_file():
+            _SETTINGS_PATH = path
             try:
                 text = path.read_text(encoding='utf-8').strip()
                 if not text:
@@ -259,15 +259,17 @@ POLL_ERROR = _S.get('poll_error', 30)
 MAX_BACKOFF = _S.get('max_backoff', 900)
 IDLE_PAUSE = _S.get('idle_pause', 300)
 
-# Popup theme
-BG = _S.get('bg', '#1e1e1e')
-FG = _S.get('fg', '#cccccc')
-FG_DIM = _S.get('fg_dim', '#888888')
-FG_HEADING = _S.get('fg_heading', '#ffffff')
-FG_LINK = _S.get('fg_link', '#4a9eff')
-BAR_BG = _S.get('bar_bg', '#333333')
-BAR_FG = _S.get('bar_fg', '#4a9eff')
-BAR_FG_WARN = _S.get('bar_fg_warn', '#e05050')
+# Popup window theme
+BG = _S.get('bg', '#2d2a2e')
+FG = _S.get('fg', '#fcfcfa')
+FG_DIM = _S.get('fg_dim', '#939293')
+FG_HEADING = _S.get('fg_heading', '#ffd866')
+FG_LINK = _S.get('fg_link', '#78dce8')
+BAR_BG = _S.get('bar_bg', '#403e41')
+BAR_FG = _S.get('bar_fg', '#78dce8')
+BAR_FG_MID = _S.get('bar_fg_mid', '#a9dc76')
+BAR_FG_WARN = _S.get('bar_fg_warn', '#fc9867')
+BAR_FG_DANGER = _S.get('bar_fg_danger', '#ff6188')
 BAR_DIVIDER = _S.get('bar_divider', '#000c')
 BAR_MARKER = _S.get('bar_marker', '#fffc')
 
@@ -323,6 +325,40 @@ _ALERT_THRESHOLDS: dict[str, list[float]] = {
     'seven_day': [95],
     'extra_usage': [50, 80, 95],
 }
+
+
+def save_language_setting(lang_code: str) -> None:
+    """Save the language preference to the settings file.
+
+    Writes to the same file that was loaded at startup.  If no settings
+    file existed, creates one at ``~/.claude/usage-monitor-settings.json``.
+
+    Parameters
+    ----------
+    lang_code : str
+        Locale code to save (e.g. ``'zh-CN'``), or empty string to
+        revert to auto-detection.
+    """
+    target = _SETTINGS_PATH or (Path.home() / '.claude' / SETTINGS_FILENAME)
+
+    existing: dict = {}
+    if target.is_file():
+        try:
+            text = target.read_text(encoding='utf-8').strip()
+            if text:
+                data = json.loads(text)
+                if isinstance(data, dict):
+                    existing = data
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    if lang_code:
+        existing['language'] = lang_code
+    else:
+        existing.pop('language', None)
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(existing, indent=4, ensure_ascii=False) + '\n', encoding='utf-8')
 
 
 def get_alert_thresholds(variant_key: str) -> list[float]:
