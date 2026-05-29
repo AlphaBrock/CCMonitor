@@ -18,6 +18,7 @@ a = Analysis(
         (str(ROOT / 'src' / 'ui' / 'popup' / 'popup.html'), 'src/ui/popup'),
         (str(ROOT / 'src' / 'ui' / 'popup' / 'popup.css'), 'src/ui/popup'),
         (str(ROOT / 'src' / 'ui' / 'popup' / 'popup.js'), 'src/ui/popup'),
+        (str(ROOT / 'assets' / 'icon' / '*.svg'), 'assets/icon'),
     ],
     hiddenimports=[
         'pystray._win32',

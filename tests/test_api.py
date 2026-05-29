@@ -12,7 +12,12 @@ from tempfile import TemporaryDirectory
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.integrations.api import API_URL_USAGE, _extract_server_message, _parse_retry_after, fetch_usage, read_access_token
+from src.integrations.api import (
+    API_URL_USAGE, _extract_server_message, _parse_retry_after,
+    fetch_profile, fetch_profile_for_provider, fetch_usage, fetch_usage_for_provider,
+    read_access_token, read_access_token_for_provider, refresh_auth_token,
+)
+from src.integrations.claude_cli import RefreshResult
 from src.presentation.i18n import LOCALE_DIR
 
 EN = json.loads((LOCALE_DIR / 'en.json').read_text(encoding='utf-8'))
@@ -69,6 +74,7 @@ class TestClaudeConfigDir(unittest.TestCase):
 # read_access_token
 # ---------------------------------------------------------------------------
 
+@patch('src.integrations.api.USAGE_PROVIDER', 'claude')
 class TestReadAccessToken(unittest.TestCase):
     """Tests for read_access_token()."""
 
@@ -127,6 +133,7 @@ class TestReadAccessToken(unittest.TestCase):
 # fetch_usage
 # ---------------------------------------------------------------------------
 
+@patch('src.integrations.api.USAGE_PROVIDER', 'claude')
 @patch('src.integrations.api.T', EN)
 class TestFetchUsage(unittest.TestCase):
     """Tests for fetch_usage()."""
@@ -262,6 +269,7 @@ class TestFetchUsage(unittest.TestCase):
 # 429 / rate limit handling
 # ---------------------------------------------------------------------------
 
+@patch('src.integrations.api.USAGE_PROVIDER', 'claude')
 @patch('src.integrations.api.T', EN)
 class TestFetchUsageRateLimit(unittest.TestCase):
     """Tests for HTTP 429 rate-limit handling in fetch_usage()."""
@@ -346,6 +354,70 @@ class TestFetchUsageRateLimit(unittest.TestCase):
         result = fetch_usage()
 
         self.assertEqual(result['server_message'], 'Internal server error')
+
+
+# ---------------------------------------------------------------------------
+# Provider routing
+# ---------------------------------------------------------------------------
+
+class TestProviderRouting(unittest.TestCase):
+    """Tests for usage_provider routing in the API facade."""
+
+    @patch('src.integrations.api.fetch_codex_usage', return_value={'seven_day': {'utilization': 25.0}})
+    def test_fetch_usage_routes_to_codex(self, mock_fetch):
+        with patch('src.integrations.api.USAGE_PROVIDER', 'codex'):
+            result = fetch_usage()
+
+        self.assertEqual(result, {'seven_day': {'utilization': 25.0}})
+        mock_fetch.assert_called_once()
+
+    @patch('src.integrations.api.fetch_codex_profile', return_value={'organization': {'organization_type': 'pro'}})
+    def test_fetch_profile_routes_to_codex(self, mock_fetch):
+        with patch('src.integrations.api.USAGE_PROVIDER', 'codex'):
+            result = fetch_profile()
+
+        self.assertEqual(result, {'organization': {'organization_type': 'pro'}})
+        mock_fetch.assert_called_once()
+
+    @patch('src.integrations.api.read_codex_access_token', return_value='codex-token')
+    def test_read_access_token_routes_to_codex(self, mock_token):
+        with patch('src.integrations.api.USAGE_PROVIDER', 'codex'):
+            result = read_access_token()
+
+        self.assertEqual(result, 'codex-token')
+        mock_token.assert_called_once()
+
+    @patch('src.integrations.api.refresh_codex_token')
+    def test_refresh_auth_token_routes_to_codex(self, mock_refresh):
+        expected = RefreshResult(success=True, updated=False, old_version='', new_version='', error='')
+        mock_refresh.return_value = expected
+
+        with patch('src.integrations.api.USAGE_PROVIDER', 'codex'):
+            result = refresh_auth_token()
+
+        self.assertIs(result, expected)
+        mock_refresh.assert_called_once()
+
+    @patch('src.integrations.api.fetch_codex_usage', return_value={'seven_day': {'utilization': 25.0}})
+    def test_explicit_fetch_usage_for_codex(self, mock_fetch):
+        result = fetch_usage_for_provider('codex')
+
+        self.assertEqual(result, {'seven_day': {'utilization': 25.0}})
+        mock_fetch.assert_called_once()
+
+    @patch('src.integrations.api.fetch_claude_profile', return_value={'organization': {'organization_type': 'claude_ai'}})
+    def test_explicit_fetch_profile_for_claude(self, mock_fetch):
+        result = fetch_profile_for_provider('claude')
+
+        self.assertEqual(result, {'organization': {'organization_type': 'claude_ai'}})
+        mock_fetch.assert_called_once()
+
+    @patch('src.integrations.api.read_codex_access_token', return_value='codex-token')
+    def test_explicit_read_access_token_for_codex(self, mock_token):
+        result = read_access_token_for_provider('codex')
+
+        self.assertEqual(result, 'codex-token')
+        mock_token.assert_called_once()
 
 
 # ---------------------------------------------------------------------------

@@ -11,12 +11,15 @@ import locale as _locale
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from .i18n import T
-from .settings import CURRENCY_SYMBOL, TOOLTIP_FIELDS, _SYSTEM_CURRENCY_SYMBOL
+from .i18n import ACTIVE_LANG, T
+from .settings import CURRENCY_SYMBOL, TOOLTIP_FIELDS, USAGE_PROVIDER, _SYSTEM_CURRENCY_SYMBOL
 
 __all__ = [
-    'elapsed_pct', 'expand_popup_fields', 'field_period', 'format_credits', 'format_tooltip',
-    'midnight_positions', 'parse_field_name', 'popup_label', 'time_until', 'tooltip_label',
+    'elapsed_pct', 'expand_popup_fields', 'field_period', 'format_credits',
+    'format_dashboard_tooltip', 'format_tooltip',
+    'midnight_positions', 'parse_field_name', 'popup_label', 'provider_auth_expired_label',
+    'provider_auth_expired_short', 'provider_label', 'provider_popup_title', 'provider_tooltip_title',
+    'time_until', 'tooltip_label',
 ]
 
 PERIOD_5H = 5 * 3600
@@ -28,6 +31,8 @@ _NUMBER_WORDS = {
 }
 _UNIT_SUFFIXES = {'hour': 'h', 'day': 'd'}
 _TITLE_CASE_EXCEPTIONS = {'oauth': 'OAuth', 'api': 'API', 'ai': 'AI'}
+_PROVIDER_LABELS = {'claude': 'Claude', 'codex': 'Codex'}
+_PROVIDER_TOOLTIP_ORDER = ('codex', 'claude')
 
 
 def parse_field_name(field: str) -> tuple[int, str, str | None] | None:
@@ -117,6 +122,34 @@ def popup_label(field: str) -> str:
 
     template_key = 'session_label' if unit == 'hour' else 'weekly_label'
     return T[template_key].format(suffix=suffix)
+
+
+def provider_popup_title() -> str:
+    """Return the popup title for the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return 'Codex 用量' if ACTIVE_LANG.startswith('zh') else 'Usage Monitor for Codex'
+    return T['popup_title']
+
+
+def provider_tooltip_title() -> str:
+    """Return the tray tooltip title for the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return 'Codex 用量' if ACTIVE_LANG.startswith('zh') else 'Codex Usage'
+    return T['tooltip_title']
+
+
+def provider_auth_expired_label() -> str:
+    """Return the auth-expired label for the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return 'Codex 会话已过期' if ACTIVE_LANG.startswith('zh') else 'Codex Session Expired'
+    return T['auth_expired_label']
+
+
+def provider_auth_expired_short() -> str:
+    """Return the short auth-expired guidance for the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return '请重新运行 codex 登录。' if ACTIVE_LANG.startswith('zh') else 'Run codex to log in again.'
+    return T['auth_expired_short']
 
 
 def field_period(field: str) -> int | None:
@@ -333,14 +366,14 @@ def format_tooltip(data: dict[str, Any]) -> str:
     """Format usage data as short tooltip text."""
     if 'error' in data:
         if data.get('auth_error'):
-            return f"{T['auth_expired_label']}\n{T['auth_expired_short']}"
+            return f"{provider_auth_expired_label()}\n{provider_auth_expired_short()}"
         error = data['error']
         server_msg = data.get('server_message')
         if server_msg:
             error += f' {server_msg}'
         return f"{T['error_label']}\n{error[:80]}"
 
-    lines = [T['tooltip_title']]
+    lines = [provider_tooltip_title()]
     for key in TOOLTIP_FIELDS:
         entry = data.get(key)
         if entry and entry.get('utilization') is not None:
@@ -353,3 +386,61 @@ def format_tooltip(data: dict[str, Any]) -> str:
             lines.append(line)
 
     return '\n'.join(lines)
+
+
+def provider_label(provider_id: str) -> str:
+    """Return the short display name for a provider id (e.g. ``'Claude'``)."""
+    return _PROVIDER_LABELS.get(provider_id, provider_id.title())
+
+
+def format_dashboard_tooltip(provider_responses: dict[str, dict[str, Any]], selected: str = 'auto') -> str:
+    """Format a compact tray tooltip for one or all providers.
+
+    The Windows tray tooltip is limited to ~127 characters, so each
+    provider is condensed to a single line without reset times.
+
+    Parameters
+    ----------
+    provider_responses : dict
+        Mapping of provider id to its latest raw API response.
+    selected : str
+        ``'auto'`` shows every available provider; ``'codex'`` or
+        ``'claude'`` shows only that one.
+
+    Returns
+    -------
+    str
+        One line per shown provider, or the generic title when no
+        provider has data yet.
+    """
+    lines: list[str] = []
+    for provider_id in _PROVIDER_TOOLTIP_ORDER:
+        if selected != 'auto' and provider_id != selected:
+            continue
+        data = provider_responses.get(provider_id)
+        if not data:
+            continue
+        lines.append(_provider_tooltip_line(provider_id, data))
+
+    if not lines:
+        return provider_tooltip_title()
+
+    return '\n'.join(lines)
+
+
+def _provider_tooltip_line(provider_id: str, data: dict[str, Any]) -> str:
+    """Build a one-line compact tooltip summary for a single provider."""
+    label = provider_label(provider_id)
+    if 'error' in data:
+        return f"{label}: {data['error'][:40]}"
+
+    parts: list[str] = []
+    for key in TOOLTIP_FIELDS:
+        entry = data.get(key)
+        if entry and entry.get('utilization') is not None:
+            parts.append(f"{tooltip_label(key)} {entry['utilization']:.0f}%")
+
+    if not parts:
+        return f'{label}: -'
+
+    return f'{label}  ' + ' · '.join(parts)

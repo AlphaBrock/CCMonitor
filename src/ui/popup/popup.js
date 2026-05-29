@@ -1,9 +1,17 @@
 let els;
 let translations = {};
-let statusState = {};
+let statusStateByProvider = {};
 let textTimerId = null;
 let pinRequestPending = false;
+let activeView = 'all';
+let lastData = { providers: [] };
 const BAR_LENGTH = 20;
+
+const TAB_ICON_ASSETS = {
+    all: { path: '../../../assets/icon/application.svg', mode: 'mask' },
+    codex: { path: '../../../assets/icon/openai.svg', mode: 'mask' },
+    claude: { path: '../../../assets/icon/claude-color.svg', mode: 'mask' },
+};
 
 function init(config) {
     const styles = document.documentElement.style;
@@ -13,26 +21,12 @@ function init(config) {
 
     translations = config.t;
     document.getElementById('title').textContent = translations.title;
-    document.getElementById('headingAccount').textContent = translations.account;
-    document.getElementById('labelEmail').textContent = translations.email;
-    document.getElementById('labelPlan').textContent = translations.plan;
-    document.getElementById('headingUsage').textContent = translations.usage;
-    document.getElementById('headingExtraUsage').textContent = translations.extra_usage;
     document.getElementById('appVersion').textContent = config.app_version;
 
     els = {
         header: document.getElementById('windowHeader'),
-        accountSection: document.getElementById('accountSection'),
-        emailRow: document.getElementById('emailRow'),
-        emailValue: document.getElementById('emailValue'),
-        planRow: document.getElementById('planRow'),
-        planValue: document.getElementById('planValue'),
-        usageSection: document.getElementById('usageSection'),
-        usageRows: document.getElementById('usageRows'),
-        extraSection: document.getElementById('extraSection'),
-        extraRow: document.getElementById('extraRow'),
-        statusSection: document.getElementById('statusSection'),
-        statusText: document.getElementById('statusText'),
+        switcher: document.getElementById('providerSwitcher'),
+        cards: document.getElementById('providerCards'),
         pinBtn: document.getElementById('pinBtn'),
         closeBtn: document.getElementById('closeBtn'),
     };
@@ -52,6 +46,7 @@ function bindWindowActions() {
 
     els.pinBtn.addEventListener('mousedown', stopDrag);
     els.closeBtn.addEventListener('mousedown', stopDrag);
+    els.switcher.addEventListener('mousedown', stopDrag);
 
     els.pinBtn.addEventListener('click', async () => {
         if (pinRequestPending) {
@@ -94,176 +89,273 @@ function setPinned(pinned) {
 }
 
 function updateData(data) {
-    const hasProfile = Boolean(data.profile);
-    els.accountSection.classList.toggle('visible', hasProfile);
-    if (hasProfile) {
-        els.emailValue.textContent = data.profile.email;
-        els.emailRow.style.display = data.profile.email ? '' : 'none';
-        els.planValue.textContent = data.profile.plan;
-        els.planRow.style.display = data.profile.plan ? '' : 'none';
+    lastData = data || { providers: [] };
+    const providers = lastData.providers || [];
+    if (activeView !== 'all' && !providers.some((provider) => provider.id === activeView)) {
+        activeView = 'all';
     }
 
-    const hasUsage = Boolean(data.usage?.length);
-    els.usageSection.classList.toggle('visible', hasUsage);
-    if (hasUsage) {
-        els.usageRows.replaceChildren(...data.usage.map(createUsageRow));
+    renderSwitcher(providers);
+    renderProviders(providers);
+    startStatusTimer();
+}
+
+function renderSwitcher(providers) {
+    const buttons = [createSwitcherButton('all', translations.all || 'All', '▦')];
+    for (const provider of providers) {
+        buttons.push(createSwitcherButton(provider.id, provider.title, provider.icon));
+    }
+    els.switcher.replaceChildren(...buttons);
+}
+
+function createSwitcherButton(viewId, labelText, iconText) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'provider-tab';
+    button.classList.toggle('active', activeView === viewId);
+    button.dataset.view = viewId;
+
+    const icon = document.createElement('span');
+    icon.className = 'provider-tab-icon';
+    const asset = TAB_ICON_ASSETS[viewId];
+    if (asset?.mode === 'mask') {
+        icon.classList.add('provider-tab-icon-mask');
+        icon.style.setProperty('--provider-icon-url', `url("${asset.path}")`);
     } else {
-        els.usageRows.replaceChildren();
+        icon.textContent = iconText;
     }
 
-    const hasExtra = Boolean(data.extra);
-    els.extraSection.classList.toggle('visible', hasExtra);
-    if (hasExtra) {
-        els.extraRow.replaceChildren(createUsageRow({
-            label: translations.extra_usage,
-            pct_text: data.extra.pct_text,
-            tone: data.extra.tone,
-            bar_text: data.extra.bar_text,
-            reset_text: data.extra.spent_text,
-        }));
-    } else {
-        els.extraRow.replaceChildren();
-    }
+    const label = document.createElement('span');
+    label.textContent = labelText;
 
+    button.append(icon, label);
+    button.addEventListener('click', () => {
+        activeView = viewId;
+        updateData(lastData);
+    });
+    return button;
+}
+
+function renderProviders(providers) {
+    const visibleProviders = activeView === 'all'
+        ? providers
+        : providers.filter((provider) => provider.id === activeView);
+    els.cards.replaceChildren(...visibleProviders.map(createProviderCard));
     requestAnimationFrame(fitTextBars);
-    updateStatus(data.status);
+}
+
+function createProviderCard(provider) {
+    const card = document.createElement('section');
+    card.className = `provider-card provider-${provider.id}`;
+    card.dataset.provider = provider.id;
+
+    const header = document.createElement('div');
+    header.className = 'provider-card-head';
+
+    const titleWrap = document.createElement('div');
+    const title = document.createElement('h2');
+    title.textContent = provider.title;
+    const status = document.createElement('div');
+    status.className = 'provider-status';
+    status.dataset.providerStatus = provider.id;
+    titleWrap.append(title, status);
+
+    const plan = document.createElement('div');
+    plan.className = 'provider-plan';
+    plan.textContent = provider.profile?.plan || '';
+    header.append(titleWrap, plan);
+    card.append(header);
+
+    if (provider.profile?.email) {
+        const email = document.createElement('div');
+        email.className = 'provider-email';
+        email.textContent = provider.profile.email;
+        card.append(email);
+    }
+
+    const usageRows = provider.usage || [];
+    if (usageRows.length) {
+        const usage = document.createElement('div');
+        usage.className = 'usage-list';
+        usage.replaceChildren(...usageRows.map(createUsageRow));
+        card.append(usage);
+    }
+
+    if (provider.extra) {
+        const extra = document.createElement('div');
+        extra.className = 'extra-block';
+        const extraTitle = document.createElement('div');
+        extraTitle.className = 'block-title';
+        extraTitle.textContent = translations.extra_usage;
+        extra.append(
+            extraTitle,
+            createUsageRow({
+                label: translations.extra_usage,
+                pct_text: provider.extra.pct_text,
+                tone: provider.extra.tone,
+                bar_text: provider.extra.bar_text,
+                reset_text: provider.extra.spent_text,
+            }),
+        );
+        card.append(extra);
+    }
+
+    card.append(createMetricsBlock(provider.metrics));
+    setProviderStatusState(provider.id, provider.status);
+    return card;
 }
 
 function createUsageRow(entry) {
     const row = document.createElement('div');
     row.className = 'usage-row';
 
-    const head = document.createElement('div');
-    head.className = 'usage-head';
-
-    const label = document.createElement('span');
+    const label = document.createElement('div');
     label.className = 'usage-label';
     label.textContent = entry.label;
 
-    const percent = document.createElement('span');
-    percent.className = `usage-pct tone-${entry.tone}`;
-    percent.textContent = entry.pct_text;
-
     const bar = createTextBar(entry.bar_text, entry.tone);
 
-    head.append(label, percent);
-    row.append(head, bar);
+    const foot = document.createElement('div');
+    foot.className = 'usage-foot';
+
+    const percent = document.createElement('span');
+    percent.className = `usage-pct tone-${entry.tone}`;
+    percent.textContent = `${entry.pct_text} used`;
+    foot.append(percent);
 
     if (entry.reset_text) {
-        const reset = document.createElement('div');
+        const reset = document.createElement('span');
         reset.className = 'reset-text';
         reset.textContent = entry.reset_text;
-        row.append(reset);
+        foot.append(reset);
     }
 
+    row.append(label, bar, foot);
     return row;
 }
 
 function createTextBar(barText, tone) {
     const bar = document.createElement('div');
     bar.className = `text-bar tone-${tone}`;
-    const inner = document.createElement('div');
-    inner.className = 'text-bar-inner';
-
-    const normalizedBar = (barText || '').padEnd(BAR_LENGTH, '░').slice(0, BAR_LENGTH);
-
-    const track = document.createElement('span');
-    track.className = 'text-bar-track';
-    track.textContent = '░'.repeat(BAR_LENGTH);
-
-    const fill = document.createElement('span');
-    fill.className = 'text-bar-fill';
-    fill.textContent = normalizedBar.replaceAll('░', ' ');
-
-    inner.append(track, fill);
-    bar.append(inner);
-
+    const glyphs = document.createElement('span');
+    glyphs.className = 'text-bar-glyphs';
+    glyphs.textContent = (barText || '').padEnd(BAR_LENGTH, '░').slice(0, BAR_LENGTH);
+    bar.append(glyphs);
     return bar;
 }
 
-function fitTextBars() {
-    for (const bar of document.querySelectorAll('.text-bar')) {
-        const inner = bar.querySelector('.text-bar-inner');
-        const track = bar.querySelector('.text-bar-track');
-        const fill = bar.querySelector('.text-bar-fill');
-        if (!inner || !track || !fill) {
-            continue;
-        }
+function createMetricsBlock(metrics) {
+    const block = document.createElement('div');
+    block.className = 'metrics-block';
 
-        track.style.transform = 'translateY(-50%)';
-        fill.style.transform = 'translateY(-50%)';
+    const title = document.createElement('div');
+    title.className = 'block-title';
+    title.textContent = translations.local_metrics;
 
-        const naturalWidth = track.scrollWidth;
-        const availableWidth = inner.clientWidth;
-        if (!naturalWidth || !availableWidth) {
-            continue;
-        }
-
-        const scale = availableWidth / naturalWidth;
-        const transform = `translateY(-50%) scaleX(${scale})`;
-        track.style.transform = transform;
-        fill.style.transform = transform;
+    const grid = document.createElement('div');
+    grid.className = 'metrics-grid';
+    for (const item of metrics?.items || []) {
+        const cell = document.createElement('div');
+        cell.className = 'metric-cell';
+        const label = document.createElement('div');
+        label.className = 'metric-label';
+        label.textContent = item.label;
+        const value = document.createElement('div');
+        value.className = 'metric-value';
+        value.textContent = item.value;
+        cell.append(label, value);
+        grid.append(cell);
     }
+
+    const note = document.createElement('div');
+    note.className = 'metrics-note';
+    note.textContent = metrics?.note || '';
+
+    block.append(title, grid, note);
+    return block;
 }
 
-function updateStatus(status) {
-    if (textTimerId) {
-        clearInterval(textTimerId);
-        textTimerId = null;
-    }
-
+function setProviderStatusState(providerId, status) {
     if (!status) {
-        els.statusSection.classList.remove('visible');
+        statusStateByProvider[providerId] = null;
         return;
     }
 
-    els.statusSection.classList.add('visible');
-
     if (status.last_success_time !== undefined) {
-        statusState = {
+        statusStateByProvider[providerId] = {
             lastSuccessTime: status.last_success_time,
             nextPollTime: status.next_poll_time,
             refreshing: status.refreshing,
             error: status.error,
         };
-        els.statusSection.classList.toggle('error', Boolean(status.error));
-        tickStatusText();
-        textTimerId = setInterval(tickStatusText, 1000);
         return;
     }
 
-    statusState = {};
-    els.statusText.textContent = status.text || '';
-    els.statusSection.classList.toggle('error', Boolean(status.is_error));
+    statusStateByProvider[providerId] = {
+        text: status.text || '',
+        isError: Boolean(status.is_error),
+    };
+}
+
+function startStatusTimer() {
+    if (textTimerId) {
+        clearInterval(textTimerId);
+    }
+    tickStatusText();
+    textTimerId = setInterval(tickStatusText, 1000);
 }
 
 function tickStatusText() {
-    if (!statusState.lastSuccessTime) {
-        return;
-    }
-
-    const now = Date.now() / 1000;
-    const secondsAgo = Math.max(0, Math.floor(now - statusState.lastSuccessTime));
-    const isStale = Boolean(statusState.nextPollTime) && now > statusState.nextPollTime + 30;
-    els.usageSection.classList.toggle('stale', isStale);
-    els.extraSection.classList.toggle('stale', isStale);
-
-    const parts = [formatDuration(secondsAgo)];
-
-    if (statusState.refreshing) {
-        parts.push(translations.status_refreshing);
-    } else if (statusState.error) {
-        parts.push(statusState.error);
-    } else if (secondsAgo >= 60 && statusState.nextPollTime) {
-        const secondsUntil = Math.max(0, Math.floor(statusState.nextPollTime - now));
-        if (secondsUntil > 0) {
-            parts.push(
-                translations.status_next_update.replace('{duration}', formatCountdown(secondsUntil)),
-            );
+    for (const node of document.querySelectorAll('[data-provider-status]')) {
+        const providerId = node.dataset.providerStatus;
+        const status = statusStateByProvider[providerId];
+        if (!status) {
+            node.textContent = '';
+            node.classList.remove('error');
+            continue;
         }
-    }
 
-    els.statusText.textContent = parts.join(' · ');
+        if (status.text !== undefined) {
+            node.textContent = status.text;
+            node.classList.toggle('error', Boolean(status.isError));
+            continue;
+        }
+
+        const now = Date.now() / 1000;
+        const secondsAgo = Math.max(0, Math.floor(now - status.lastSuccessTime));
+        const parts = [formatDuration(secondsAgo)];
+        if (status.refreshing) {
+            parts.push(translations.status_refreshing);
+        } else if (status.error) {
+            parts.push(status.error);
+        } else if (secondsAgo >= 60 && status.nextPollTime) {
+            const secondsUntil = Math.max(0, Math.floor(status.nextPollTime - now));
+            if (secondsUntil > 0) {
+                parts.push(translations.status_next_update.replace('{duration}', formatCountdown(secondsUntil)));
+            }
+        }
+
+        node.textContent = parts.join(' · ');
+        node.classList.toggle('error', Boolean(status.error));
+    }
+}
+
+function fitTextBars() {
+    for (const bar of document.querySelectorAll('.text-bar')) {
+        const glyphs = bar.querySelector('.text-bar-glyphs');
+        if (!glyphs) {
+            continue;
+        }
+
+        glyphs.style.transform = 'scaleX(1)';
+        const naturalWidth = glyphs.scrollWidth;
+        const availableWidth = bar.clientWidth;
+        if (!naturalWidth || !availableWidth) {
+            continue;
+        }
+
+        glyphs.style.transform = `scaleX(${availableWidth / naturalWidth})`;
+    }
 }
 
 function formatDuration(totalSeconds) {

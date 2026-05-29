@@ -6,6 +6,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-05-29
+
+### Added
+
+- Optional Codex OAuth usage provider that reads Codex `auth.json`, refreshes ChatGPT OAuth tokens, and displays Codex usage through the existing session and weekly rows
+- Desktop detail window now shows an All / Codex / Claude switcher and can display both Codex and Claude usage side by side
+- Local 30-day cost, token totals, latest-token, and top-model estimates are now shown for Codex and Claude from local JSONL logs
+- Tray provider selection now lets users choose Auto, Codex, or Claude for tray display
+
+### Changed
+
+- Startup warnings, tooltip titles, and session-expired guidance now reflect the selected usage provider instead of always referring to Claude Code
+- `usage_provider` now selects the primary provider for alerts, event commands, and Auto tray icon bars; the desktop window still attempts to show both providers
+- Auto tray mode now shows Codex and Claude in the hover tooltip while keeping the tray icon bars tied to the primary provider
+
+### Fixed
+
+- Provider tab icons now load from the packaged SVG assets and render consistently as compact white icons
+- Claude local Today estimates now include supported `.pi` agent session logs
+
+---
+
+### 新增
+
+- 新增可选 Codex OAuth 用量来源，可读取 Codex `auth.json`、刷新 ChatGPT OAuth 令牌，并通过现有会话和周用量行展示 Codex 用量
+- 桌面详情窗口新增 All / Codex / Claude 切换，可并排展示 Codex 与 Claude 用量
+- 新增基于本地 JSONL 日志的 Codex 与 Claude 30 天成本、Token 总量、最近 Token 和主要模型估算
+- 托盘 provider 选择现在支持 Auto、Codex、Claude 三种显示模式
+
+### 变更
+
+- 启动警告、托盘提示标题和会话过期指引现在会根据所选用量来源显示，不再始终提示 Claude Code
+- `usage_provider` 现在用于选择提醒、事件命令和 Auto 托盘图标进度条的主 provider；桌面窗口仍会尝试展示两个 provider
+- Auto 托盘模式现在会在悬停提示中显示 Codex 和 Claude，同时图标进度条继续使用主 provider
+
+### 修复
+
+- Provider tab 图标现在会从打包的 SVG 资源加载，并统一渲染为更紧凑的白色图标
+- Claude 本地 Today 估算现在会包含受支持的 `.pi` agent session 日志
+
 ## [1.15.6] - 2026-05-22
 
 ### Fixed

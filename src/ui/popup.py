@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import webview  # type: ignore[import-untyped]  # no type stubs available
 
 from src import __version__
+from src.integrations.local_usage import LocalUsageSummary, local_usage_summary
 from src.presentation.formatting import format_credits, parse_field_name, popup_label, time_until, tooltip_label
 from src.presentation.i18n import T
 from src.presentation.settings import (
@@ -26,7 +27,7 @@ from src.presentation.settings import (
 
 if TYPE_CHECKING:
     from src.runtime.app import UsageMonitorForClaude
-    from src.runtime.cache import CacheSnapshot
+    from src.runtime.cache import CacheSnapshot, DashboardSnapshot
 
 
 _POPUP_DIR = Path(__file__).parent / 'popup'
@@ -34,6 +35,9 @@ BASELINE_DPI = 96
 _BAR_WIDTH = 20
 _CHECK_MS = 1000
 _VISIBLE_USAGE_FIELDS = ('five_hour', 'seven_day')
+_PROVIDER_ORDER = ('codex', 'claude')
+_PROVIDER_TITLES = {'codex': 'Codex', 'claude': 'Claude'}
+_PROVIDER_ICONS = {'codex': '◌', 'claude': '✺'}
 _GWL_EXSTYLE = -20
 _WS_EX_APPWINDOW = 0x00040000
 _WS_EX_TOOLWINDOW = 0x00000080
@@ -143,8 +147,39 @@ def _usage_row(field: str, entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def snapshot_to_dict(snap: CacheSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+def snapshot_to_dict(snap: CacheSnapshot | DashboardSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
     """Convert a cache snapshot into data for frontend init and incremental updates."""
+    if hasattr(snap, 'providers'):
+        return _dashboard_to_dict(snap, next_poll_time=next_poll_time)  # type: ignore[arg-type]
+    return _single_snapshot_to_dict(snap, next_poll_time=next_poll_time)
+
+
+def _dashboard_to_dict(snap: DashboardSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+    """Convert a dashboard snapshot into frontend data."""
+    providers: list[dict[str, Any]] = []
+    for provider_id in _PROVIDER_ORDER:
+        provider_snap = snap.providers.get(provider_id)
+        if provider_snap is None:
+            continue
+        providers.append(_provider_to_dict(provider_id, provider_snap, next_poll_time=next_poll_time))
+
+    return {
+        'providers': providers,
+        'primary_provider': snap.primary_provider,
+    }
+
+
+def _single_snapshot_to_dict(snap: CacheSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+    """Convert a single-provider snapshot into frontend data."""
+    provider_id = getattr(snap, 'provider_id', 'claude')
+    return {
+        'providers': [_provider_to_dict(provider_id, snap, next_poll_time=next_poll_time)],
+        'primary_provider': provider_id,
+    }
+
+
+def _provider_to_dict(provider_id: str, snap: CacheSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+    """Convert one provider snapshot into a frontend card dict."""
     profile = None
     if snap.profile:
         account = snap.profile.get('account', {})
@@ -178,14 +213,57 @@ def snapshot_to_dict(snap: CacheSnapshot, next_poll_time: float | None = None) -
                 }
 
     return {
+        'id': provider_id,
+        'title': _PROVIDER_TITLES.get(provider_id, provider_id.title()),
+        'icon': _PROVIDER_ICONS.get(provider_id, '•'),
         'profile': profile,
         'usage': usage_rows,
         'extra': extra,
+        'metrics': _local_metrics(provider_id),
         'status': _status_dict(snap, next_poll_time),
     }
 
 
-def init_config(snap: CacheSnapshot, *, pinned: bool, next_poll_time: float | None = None) -> dict[str, Any]:
+def _local_metrics(provider_id: str) -> dict[str, Any]:
+    """Build local token and cost metrics for one provider."""
+    try:
+        summary = local_usage_summary(provider_id)
+    except Exception:
+        summary = LocalUsageSummary(None, None, None, None, None)
+
+    return {
+        'items': [
+            {'label': T['local_today'], 'value': _format_usd(summary.today_cost_usd)},
+            {'label': T['local_30d_cost'], 'value': _format_usd(summary.total_cost_usd)},
+            {'label': T['local_30d_tokens'], 'value': _format_tokens(summary.total_tokens)},
+            {'label': T['local_latest_tokens'], 'value': _format_tokens(summary.latest_tokens)},
+            {'label': T['local_top_model'], 'value': summary.top_model or '—'},
+        ],
+        'note': T['local_estimate_note'],
+    }
+
+
+def _format_usd(value: float | None) -> str:
+    """Format a USD amount for local log estimates."""
+    if value is None:
+        return '—'
+    return f'${value:,.2f}'
+
+
+def _format_tokens(value: int | None) -> str:
+    """Format a token count compactly."""
+    if value is None:
+        return '—'
+    if value >= 1_000_000_000:
+        return f'{value / 1_000_000_000:.1f}B'
+    if value >= 1_000_000:
+        return f'{value / 1_000_000:.1f}M'
+    if value >= 1_000:
+        return f'{value / 1_000:.0f}K'
+    return str(value)
+
+
+def init_config(snap: CacheSnapshot | DashboardSnapshot, *, pinned: bool, next_poll_time: float | None = None) -> dict[str, Any]:
     """Build the frontend initialization config dict."""
     return {
         'colors': {
@@ -201,12 +279,14 @@ def init_config(snap: CacheSnapshot, *, pinned: bool, next_poll_time: float | No
             'bar_fg_danger': BAR_FG_DANGER,
         },
         't': {
-            'title': T['popup_title'],
+            'title': T['dashboard_title'],
+            'all': T['all_providers'],
             'account': T['account'],
             'email': T['email'],
             'plan': T['plan'],
             'usage': T['usage'],
             'extra_usage': T['extra_usage'],
+            'local_metrics': T['local_metrics'],
             'status_updated_s': T['status_updated_s'],
             'status_updated': T['status_updated'],
             'status_next_update': T['status_next_update'],
@@ -253,7 +333,7 @@ class UsagePopup:
         self._layout_ready = False
         self._popup_hwnd = 0
         self._last_height = 320
-        self._last_version = app.cache.snapshot.version
+        self._last_version = self._current_snapshot().version
         self._last_next_poll_time = app._next_poll_time
 
         api = _PopupApi(self)
@@ -339,7 +419,7 @@ class UsagePopup:
 
     def _on_loaded(self) -> None:
         """Inject init data after page load and start the incremental update loop."""
-        config = init_config(self.app.cache.snapshot, pinned=self._pinned, next_poll_time=self.app._next_poll_time)
+        config = init_config(self._current_snapshot(), pinned=self._pinned, next_poll_time=self.app._next_poll_time)
         self._window.evaluate_js(f'init({json.dumps(config)})')
 
         self._popup_hwnd = self._window.native.Handle.ToInt32()
@@ -382,7 +462,7 @@ class UsagePopup:
                 continue
 
             try:
-                snap = self.app.cache.snapshot
+                snap = self._current_snapshot()
                 next_poll_time = self.app._next_poll_time
                 if snap.version == self._last_version and next_poll_time == self._last_next_poll_time:
                     continue
@@ -393,6 +473,13 @@ class UsagePopup:
                 self._window.evaluate_js(f'updateData({json.dumps(payload)})')
             except Exception:
                 self._running = False
+
+    def _current_snapshot(self) -> CacheSnapshot | DashboardSnapshot:
+        """Return the app dashboard snapshot, with a single-cache fallback for tests."""
+        dashboard_cache = getattr(self.app, 'dashboard_cache', None)
+        if dashboard_cache is not None:
+            return dashboard_cache.snapshot
+        return self.app.cache.snapshot
 
     def _bring_to_front(self) -> None:
         """Bring the window to the foreground while preserving the current pin state."""

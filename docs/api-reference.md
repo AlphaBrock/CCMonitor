@@ -1,11 +1,11 @@
 # API Reference
 
-Example responses from the Anthropic OAuth API endpoints used by the app. These serve as implementation reference - field names, data types, and structure.
+Example responses from the provider OAuth API endpoints used by the app. These serve as implementation reference - field names, data types, and structure.
 
 > [!NOTE]
 > These are real-world examples with anonymized data, captured in March 2026. Fields may change without notice as these are undocumented internal endpoints. If your API response contains fields not listed here, please open an issue with an anonymized example so we can keep this reference up to date.
 
-## /api/oauth/usage
+## Claude /api/oauth/usage
 
 ```
 https://api.anthropic.com/api/oauth/usage
@@ -38,7 +38,36 @@ https://api.anthropic.com/api/oauth/usage
 }
 ```
 
-## /api/oauth/profile
+## Codex /backend-api/wham/usage
+
+```
+https://chatgpt.com/backend-api/wham/usage
+```
+
+The app maps `limit_window_seconds: 18000` to `five_hour` and `limit_window_seconds: 604800` to `seven_day`. `credits.balance` is not mapped to `extra_usage` because it is a remaining balance, not spent usage.
+
+```json
+{
+  "plan_type": "pro",
+  "rate_limit": {
+    "primary_window": {
+      "used_percent": 15,
+      "reset_at": 1735401600,
+      "limit_window_seconds": 18000
+    },
+    "secondary_window": {
+      "used_percent": 5,
+      "reset_at": 1735920000,
+      "limit_window_seconds": 604800
+    }
+  },
+  "credits": {
+    "has_credits": true,
+    "unlimited": false,
+    "balance": 150.0
+  }
+}
+## Claude /api/oauth/profile
 
 ```
 https://api.anthropic.com/api/oauth/profile

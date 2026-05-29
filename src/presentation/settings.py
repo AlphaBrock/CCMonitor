@@ -22,8 +22,8 @@ __all__ = [
     'LANGUAGE', 'MAX_BACKOFF',
     'ON_RESET_COMMAND', 'ON_STARTUP_COMMAND', 'ON_THRESHOLD_COMMAND',
     'POLL_ERROR', 'POLL_FAST', 'POLL_FAST_EXTRA', 'POLL_INTERVAL',
-    'POPUP_FIELDS', 'SETTINGS_FILENAME', 'TOOLTIP_FIELDS',
-    'get_alert_thresholds', 'save_language_setting',
+    'POPUP_FIELDS', 'SETTINGS_FILENAME', 'TOOLTIP_FIELDS', 'TRAY_PROVIDER', 'USAGE_PROVIDER',
+    'get_alert_thresholds', 'save_language_setting', 'save_tray_provider',
 ]
 
 SETTINGS_FILENAME = 'usage-monitor-settings.json'
@@ -50,6 +50,8 @@ _BOOL_KEYS = frozenset({'alert_time_aware'})
 _STRING_LIST_KEYS = frozenset({'tooltip_fields'})
 _WILDCARD_STRING_LIST_KEYS = frozenset({'popup_fields'})
 _VALID_BAR_MODES = frozenset({'utilization', 'overage'})
+_VALID_USAGE_PROVIDERS = frozenset({'claude', 'codex'})
+_VALID_TRAY_PROVIDERS = frozenset({'auto', 'claude', 'codex'})
 
 
 _SETTINGS_PATH: Path | None = None
@@ -146,6 +148,22 @@ def _validate(data: dict, path: Path) -> dict:
         elif key in _STRING_KEYS:
             if not isinstance(value, str):
                 errors.append(f'  {key}: expected a string, got {type(value).__name__}')
+                drop.append(key)
+
+        elif key == 'usage_provider':
+            if not isinstance(value, str):
+                errors.append(f'  {key}: expected a string, got {type(value).__name__}')
+                drop.append(key)
+            elif value not in _VALID_USAGE_PROVIDERS:
+                errors.append(f'  {key}: must be one of {", ".join(sorted(_VALID_USAGE_PROVIDERS))}, got {value}')
+                drop.append(key)
+
+        elif key == 'tray_provider':
+            if not isinstance(value, str):
+                errors.append(f'  {key}: expected a string, got {type(value).__name__}')
+                drop.append(key)
+            elif value not in _VALID_TRAY_PROVIDERS:
+                errors.append(f'  {key}: must be one of {", ".join(sorted(_VALID_TRAY_PROVIDERS))}, got {value}')
                 drop.append(key)
 
         elif key in _COMMAND_KEYS:
@@ -288,6 +306,12 @@ ICON_DARK = _icon_colors('icon_dark', {
 # Tray icon fields
 ICON_FIELDS: list[str] = _S.get('icon_fields', ['five_hour', 'seven_day'])
 
+# 用量来源
+USAGE_PROVIDER: str = _S.get('usage_provider', 'claude')
+
+# 托盘显示的 provider（auto = 全部）
+TRAY_PROVIDER: str = _S.get('tray_provider', 'auto')
+
 # Tooltip fields
 TOOLTIP_FIELDS: list[str] = _S.get('tooltip_fields', ['five_hour', 'seven_day'])
 
@@ -327,17 +351,19 @@ _ALERT_THRESHOLDS: dict[str, list[float]] = {
 }
 
 
-def save_language_setting(lang_code: str) -> None:
-    """Save the language preference to the settings file.
+def _write_setting(key: str, value: str | None) -> None:
+    """Persist a single key to the settings file.
 
     Writes to the same file that was loaded at startup.  If no settings
     file existed, creates one at ``~/.claude/usage-monitor-settings.json``.
+    A falsy *value* removes the key, reverting it to its default.
 
     Parameters
     ----------
-    lang_code : str
-        Locale code to save (e.g. ``'zh-CN'``), or empty string to
-        revert to auto-detection.
+    key : str
+        Settings key to write.
+    value : str or None
+        Value to store, or empty/``None`` to remove the key.
     """
     target = _SETTINGS_PATH or (Path.home() / '.claude' / SETTINGS_FILENAME)
 
@@ -352,13 +378,37 @@ def save_language_setting(lang_code: str) -> None:
         except (json.JSONDecodeError, OSError):
             pass
 
-    if lang_code:
-        existing['language'] = lang_code
+    if value:
+        existing[key] = value
     else:
-        existing.pop('language', None)
+        existing.pop(key, None)
 
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(existing, indent=4, ensure_ascii=False) + '\n', encoding='utf-8')
+
+
+def save_language_setting(lang_code: str) -> None:
+    """Save the language preference to the settings file.
+
+    Parameters
+    ----------
+    lang_code : str
+        Locale code to save (e.g. ``'zh-CN'``), or empty string to
+        revert to auto-detection.
+    """
+    _write_setting('language', lang_code)
+
+
+def save_tray_provider(provider: str) -> None:
+    """Save the tray display provider to the settings file.
+
+    Parameters
+    ----------
+    provider : str
+        Provider to display in the tray icon and tooltip: ``'auto'``
+        (show all), ``'codex'``, or ``'claude'``.
+    """
+    _write_setting('tray_provider', provider)
 
 
 def get_alert_thresholds(variant_key: str) -> list[float]:

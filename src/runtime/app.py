@@ -18,20 +18,20 @@ from typing import Any
 
 import pystray  # type: ignore[import-untyped]  # no type stubs available
 
-from .cache import UsageCache
+from .cache import DashboardCache, UsageCache
 from .idle import get_idle_seconds, is_workstation_locked
-from src.integrations.api import api_headers
+from src.integrations.api import api_headers, auth_warning_text
 from src import __version__
 from src.integrations.autostart import is_autostart_enabled, set_autostart, sync_autostart_path
 from src.integrations.claude_cli import PROJECT_URL, check_latest_version
 from src.integrations.command import run_event_command
-from src.presentation.formatting import elapsed_pct, field_period, format_credits, format_tooltip, parse_field_name, popup_label
+from src.presentation.formatting import elapsed_pct, field_period, format_credits, format_dashboard_tooltip, parse_field_name, popup_label
 from src.presentation.i18n import ACTIVE_LANG, T, available_languages
 from src.presentation.settings import (
     ALERT_TIME_AWARE, ALERT_TIME_AWARE_BELOW, ICON_FIELDS, IDLE_PAUSE, LANGUAGE,
     ON_RESET_COMMAND, ON_STARTUP_COMMAND, ON_THRESHOLD_COMMAND,
-    POLL_ERROR, POLL_FAST, POLL_FAST_EXTRA, POLL_INTERVAL, get_alert_thresholds,
-    save_language_setting,
+    POLL_ERROR, POLL_FAST, POLL_FAST_EXTRA, POLL_INTERVAL, TRAY_PROVIDER, get_alert_thresholds,
+    save_language_setting, save_tray_provider,
 )
 from src.ui.popup import UsagePopup
 from src.ui.tray_icon import create_icon_image, create_status_image, taskbar_uses_light_theme, watch_theme_change
@@ -50,10 +50,17 @@ class UsageMonitorForClaude:
     def __init__(self) -> None:
         """Set up the tray icon with context menu and polling state."""
         self.running = True
-        self.cache = UsageCache()
+        self.dashboard_cache = DashboardCache()
+        self.cache: UsageCache = self.dashboard_cache.primary
 
         # Last raw API response (may contain 'error') - for icon and polling decisions
         self._last_response: dict[str, Any] = {}
+
+        # Latest raw response per provider - drives the tray provider selector
+        self._last_responses: dict[str, dict[str, Any]] = {}
+
+        # Provider shown in the tray icon + tooltip ('auto' shows all)
+        self._tray_provider = TRAY_PROVIDER
 
         # Notification state
         self._prev_utilization: dict[str, float] = {}
@@ -89,6 +96,21 @@ class UsageMonitorForClaude:
                     checked=lambda item: is_autostart_enabled(),
                     visible=getattr(sys, 'frozen', False),
                 ),
+                pystray.MenuItem(T['menu_provider'], pystray.Menu(
+                    pystray.MenuItem(
+                        T['provider_auto'], self._make_provider_handler('auto'),
+                        checked=lambda item: self._tray_provider == 'auto', radio=True,
+                    ),
+                    pystray.Menu.SEPARATOR,
+                    pystray.MenuItem(
+                        'Claude', self._make_provider_handler('claude'),
+                        checked=lambda item: self._tray_provider == 'claude', radio=True,
+                    ),
+                    pystray.MenuItem(
+                        'Codex', self._make_provider_handler('codex'),
+                        checked=lambda item: self._tray_provider == 'codex', radio=True,
+                    ),
+                )),
                 pystray.MenuItem(T['menu_language'], pystray.Menu(
                     pystray.MenuItem(
                         T['menu_language_auto'],
@@ -176,6 +198,18 @@ class UsageMonitorForClaude:
             self.on_quit(icon, item)
         return handler
 
+    def _make_provider_handler(self, provider: str):
+        """Return a menu click handler that switches the tray display provider.
+
+        Applied live (no restart): only the tray icon and tooltip change.
+        Alerts and event commands keep using the configured primary provider.
+        """
+        def handler(icon: Any = None, item: Any = None) -> None:
+            self._tray_provider = provider
+            save_tray_provider(provider)
+            self._render_tray()
+        return handler
+
     def on_test_reset_5h(self, icon: Any = None, item: Any = None) -> None:
         run_event_command(ON_RESET_COMMAND, {
             'USAGE_MONITOR_EVENT': 'reset',
@@ -249,9 +283,19 @@ class UsageMonitorForClaude:
 
     # Tray rendering
 
+    def _icon_response(self) -> dict[str, Any]:
+        """Return the raw response that drives the tray icon glyph and bars.
+
+        ``'auto'`` uses the primary provider (default Claude); an explicit
+        ``'codex'``/``'claude'`` selection uses that provider's response.
+        """
+        if self._tray_provider == 'auto':
+            return self._last_response
+        return self._last_responses.get(self._tray_provider, {})
+
     def _render_tray(self) -> None:
         """Re-render tray icon and tooltip from current state."""
-        data = self._last_response
+        data = self._icon_response()
         if 'error' in data:
             self.icon.icon = create_status_image('C!' if data.get('auth_error') else '!', self._light_taskbar)
         else:
@@ -275,7 +319,7 @@ class UsageMonitorForClaude:
                 time_pct_top=time_pct_top, time_pct_bottom=time_pct_bottom,
                 extra_usage_available=extra_usage_available,
             )
-        self.icon.title = format_tooltip(data)
+        self.icon.title = format_dashboard_tooltip(self._last_responses, self._tray_provider)
 
     def _on_theme_changed(self) -> None:
         """Re-render the tray icon when the Windows theme changes."""
@@ -284,15 +328,29 @@ class UsageMonitorForClaude:
             return
 
         self._light_taskbar = light
-        if self._last_response:
+        if self._last_response or self._last_responses:
             self._render_tray()
 
     # Update orchestration
 
     def update(self) -> None:
         """Request a data refresh from the cache and process the result."""
-        result = self.cache.update()
+        provider_data_changed = False
+        if self.cache is self.dashboard_cache.primary:
+            dashboard_result = self.dashboard_cache.update_all()
+            result = dashboard_result.primary
+            for provider_id, provider_result in dashboard_result.providers.items():
+                if provider_result.data is not None:
+                    self._last_responses[provider_id] = provider_result.data
+                    provider_data_changed = True
+        else:
+            result = self.cache.update()
+            if result.data is not None:
+                self._last_responses[self.dashboard_cache.primary_provider] = result.data
+                provider_data_changed = True
         if result.data is None:
+            if provider_data_changed:
+                self._render_tray()
             return
 
         self._last_response = result.data
@@ -647,7 +705,10 @@ class UsageMonitorForClaude:
         locked.  On resume, polls immediately if the regular interval
         has elapsed since the last successful fetch.
         """
-        self.cache.ensure_profile()
+        if self.cache is self.dashboard_cache.primary:
+            self.dashboard_cache.ensure_profiles()
+        else:
+            self.cache.ensure_profile()
         while self.running:
             self.update()
             interval = self._calculate_poll_interval()
@@ -713,7 +774,8 @@ class UsageMonitorForClaude:
             if getattr(sys, 'frozen', False):
                 sync_autostart_path()
             if not api_headers():
-                icon.notify(f"{T['warn_no_token']}\n{T['warn_login']}", T['popup_title'])
+                warning_body, warning_title = auth_warning_text()
+                icon.notify(warning_body, warning_title)
             self.on_show_popup()
             threading.Thread(target=watch_theme_change, args=(self._on_theme_changed,), daemon=True).start()
             self.poll_loop()

@@ -252,6 +252,11 @@ class TestSettingsOverrides(unittest.TestCase):
         settings = {'poll_interval': 300}
         self._assert_overrides(settings, [('poll_interval', 300)], absent=['poll_fast', 'bg', 'alert_thresholds_extra_usage'])
 
+    def test_usage_provider_override(self):
+        """usage_provider is loaded from settings."""
+        settings = {'usage_provider': 'codex'}
+        self._assert_overrides(settings, [('usage_provider', 'codex')])
+
     def test_threshold_overrides(self):
         """Alert threshold lists are overridden by settings."""
         settings = {'alert_thresholds_extra_usage': [70, 90], 'alert_thresholds_five_hour': [80]}
@@ -309,10 +314,22 @@ class TestSettingsValidation(unittest.TestCase):
 
     def test_valid_settings_no_message_box(self):
         """Valid settings pass through without MessageBox."""
-        data = {'poll_interval': 300, 'bg': '#000', 'icon_light': {'fg': [0, 255, 0, 255]}}
+        data = {'poll_interval': 300, 'bg': '#000', 'icon_light': {'fg': [0, 255, 0, 255]}, 'usage_provider': 'codex'}
         result, mock = self._run_validate(data)
         self.assertEqual(result, data)
         mock.windll.user32.MessageBoxW.assert_not_called()
+
+    def test_invalid_usage_provider_dropped(self):
+        """Invalid usage_provider is dropped."""
+        result, mock = self._run_validate({'usage_provider': 'openai'})
+        self.assertNotIn('usage_provider', result)
+        mock.windll.user32.MessageBoxW.assert_called_once()
+
+    def test_non_string_usage_provider_dropped(self):
+        """Non-string usage_provider is dropped."""
+        result, mock = self._run_validate({'usage_provider': 123})
+        self.assertNotIn('usage_provider', result)
+        mock.windll.user32.MessageBoxW.assert_called_once()
 
     def test_string_for_numeric_key(self):
         """String value for numeric key is dropped."""

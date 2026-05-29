@@ -7,12 +7,16 @@ Tests for the desktop popup window and frontend data shaping.
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from src.integrations.local_usage import LocalUsageSummary
 from src.presentation.i18n import T
-from src.runtime.cache import CacheSnapshot
+from src.runtime.cache import CacheSnapshot, DashboardSnapshot
 from src.ui.popup import UsagePopup, build_text_bar, init_config, snapshot_to_dict, tone_for_percent, usage_entries
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _snap(
@@ -31,6 +35,20 @@ def _snap(
         last_error=last_error,
         version=version,
     )
+
+
+def _local_summary() -> LocalUsageSummary:
+    return LocalUsageSummary(
+        today_cost_usd=1.25,
+        total_cost_usd=12.5,
+        total_tokens=212_700_000,
+        latest_tokens=775_000,
+        top_model='gpt-5.5',
+    )
+
+
+def _first_provider(result: dict) -> dict:
+    return result['providers'][0]
 
 
 class _FakeEvent:
@@ -121,6 +139,13 @@ class TestPopupFormatting(unittest.TestCase):
 
 
 class TestSnapshotToDict(unittest.TestCase):
+    def setUp(self):
+        self.local_patch = patch('src.ui.popup.local_usage_summary', return_value=_local_summary())
+        self.local_patch.start()
+
+    def tearDown(self):
+        self.local_patch.stop()
+
     def test_usage_rows_are_fixed_to_two_fields(self):
         usage = {
             'five_hour': {'utilization': 42, 'resets_at': '2026-01-01T05:00:00Z'},
@@ -129,15 +154,16 @@ class TestSnapshotToDict(unittest.TestCase):
         }
 
         result = snapshot_to_dict(_snap(usage=usage))
+        provider = _first_provider(result)
 
-        self.assertEqual([row['field'] for row in result['usage']], ['five_hour', 'seven_day'])
-        self.assertNotIn('installations', result)
+        self.assertEqual([row['field'] for row in provider['usage']], ['five_hour', 'seven_day'])
+        self.assertNotIn('installations', provider)
 
     def test_usage_row_contains_text_bar_and_tone(self):
         usage = {'five_hour': {'utilization': 84, 'resets_at': '2027-01-01T05:00:00+00:00'}}
 
         result = snapshot_to_dict(_snap(usage=usage))
-        row = result['usage'][0]
+        row = _first_provider(result)['usage'][0]
 
         self.assertEqual(row['pct_text'], '84%')
         self.assertEqual(row['tone'], 'warn')
@@ -154,20 +180,23 @@ class TestSnapshotToDict(unittest.TestCase):
         }
 
         result = snapshot_to_dict(_snap(usage=usage))
+        extra = _first_provider(result)['extra']
 
-        self.assertEqual(result['extra']['pct_text'], '55%')
-        self.assertEqual(result['extra']['tone'], 'mid')
-        self.assertEqual(result['extra']['bar_text'], build_text_bar(55))
+        self.assertEqual(extra['pct_text'], '55%')
+        self.assertEqual(extra['tone'], 'mid')
+        self.assertEqual(extra['bar_text'], build_text_bar(55))
 
     def test_status_is_refreshing_without_usage_or_error(self):
         result = snapshot_to_dict(_snap())
-        self.assertEqual(result['status']['text'], T['status_refreshing'])
-        self.assertFalse(result['status']['is_error'])
+        status = _first_provider(result)['status']
+        self.assertEqual(status['text'], T['status_refreshing'])
+        self.assertFalse(status['is_error'])
 
     def test_status_uses_error_text_when_present(self):
         result = snapshot_to_dict(_snap(last_error='offline'))
-        self.assertEqual(result['status']['text'], 'offline')
-        self.assertTrue(result['status']['is_error'])
+        status = _first_provider(result)['status']
+        self.assertEqual(status['text'], 'offline')
+        self.assertTrue(status['is_error'])
 
     def test_profile_is_extracted(self):
         profile = {
@@ -176,12 +205,47 @@ class TestSnapshotToDict(unittest.TestCase):
         }
 
         result = snapshot_to_dict(_snap(profile=profile))
+        provider = _first_provider(result)
 
-        self.assertEqual(result['profile']['email'], 'user@example.com')
-        self.assertEqual(result['profile']['plan'], 'Pro Team')
+        self.assertEqual(provider['profile']['email'], 'user@example.com')
+        self.assertEqual(provider['profile']['plan'], 'Pro Team')
+
+    def test_dashboard_snapshot_outputs_codex_and_claude(self):
+        dashboard = DashboardSnapshot(
+            providers={
+                'codex': _snap(usage={'seven_day': {'utilization': 34}}, profile={'organization': {'organization_type': 'plus'}}, version=2),
+                'claude': _snap(usage={'five_hour': {'utilization': 0}}, profile={'organization': {'organization_type': 'claude_ai'}}, version=3),
+            },
+            primary_provider='claude',
+            version=5,
+        )
+
+        result = snapshot_to_dict(dashboard)
+
+        self.assertEqual([provider['id'] for provider in result['providers']], ['codex', 'claude'])
+        self.assertEqual(result['primary_provider'], 'claude')
+        self.assertEqual(result['providers'][0]['title'], 'Codex')
+        self.assertEqual(result['providers'][1]['title'], 'Claude')
+
+    def test_local_metrics_are_included(self):
+        result = snapshot_to_dict(_snap())
+        metrics = _first_provider(result)['metrics']
+
+        self.assertEqual(metrics['items'][0]['value'], '$1.25')
+        self.assertEqual(metrics['items'][1]['value'], '$12.50')
+        self.assertEqual(metrics['items'][2]['value'], '212.7M')
+        self.assertEqual(metrics['items'][3]['value'], '775K')
+        self.assertEqual(metrics['items'][4]['value'], 'gpt-5.5')
 
 
 class TestInitConfig(unittest.TestCase):
+    def setUp(self):
+        self.local_patch = patch('src.ui.popup.local_usage_summary', return_value=_local_summary())
+        self.local_patch.start()
+
+    def tearDown(self):
+        self.local_patch.stop()
+
     def testinit_config_contains_four_bar_colors(self):
         config = init_config(_snap(), pinned=True)
 
@@ -191,6 +255,37 @@ class TestInitConfig(unittest.TestCase):
         self.assertIn('bar_fg_warn', config['colors'])
         self.assertIn('bar_fg_danger', config['colors'])
         self.assertNotIn('claude_code', config['t'])
+        self.assertEqual(config['t']['title'], T['dashboard_title'])
+        self.assertIn('providers', config['data'])
+
+
+class TestPopupStaticAssets(unittest.TestCase):
+    def test_provider_tabs_reference_packaged_svg_assets(self):
+        script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+
+        self.assertIn('../../../assets/icon/application.svg', script)
+        self.assertIn('../../../assets/icon/openai.svg', script)
+        self.assertIn('../../../assets/icon/claude-color.svg', script)
+        self.assertIn("claude: { path: '../../../assets/icon/claude-color.svg', mode: 'mask' }", script)
+        self.assertNotIn('TAB_ICON_SVG', script)
+        self.assertNotIn('<svg', script)
+        self.assertNotIn("mode: 'image'", script)
+
+    def test_provider_tab_icon_has_fixed_large_size(self):
+        stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
+
+        self.assertIn('.provider-tab-icon', stylesheet)
+        self.assertIn('width: 22px', stylesheet)
+        self.assertIn('height: 22px', stylesheet)
+        self.assertIn('color: #ffffff', stylesheet)
+        self.assertIn('.provider-tab-icon-mask', stylesheet)
+        self.assertIn('mask: var(--provider-icon-url) center / contain no-repeat', stylesheet)
+
+    def test_pyinstaller_spec_includes_svg_icons(self):
+        spec = (ROOT / 'packaging' / 'ccmonitor.spec').read_text(encoding='utf-8')
+
+        self.assertIn("'assets' / 'icon' / '*.svg'", spec)
+        self.assertIn("'assets/icon'", spec)
 
 
 class TestUsagePopupWindow(unittest.TestCase):

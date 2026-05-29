@@ -15,11 +15,23 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from src.integrations.api import fetch_profile, fetch_usage, read_access_token
-from src.integrations.claude_cli import RefreshResult, refresh_token
-from src.presentation.settings import MAX_BACKOFF, POLL_FAST, POLL_INTERVAL
+from src.integrations.api import (
+    fetch_profile,
+    fetch_profile_for_provider,
+    fetch_usage,
+    fetch_usage_for_provider,
+    read_access_token,
+    read_access_token_for_provider,
+    refresh_auth_token,
+    refresh_auth_token_for_provider,
+)
+from src.integrations.claude_cli import RefreshResult
+from src.presentation.settings import MAX_BACKOFF, POLL_FAST, POLL_INTERVAL, USAGE_PROVIDER
 
-__all__ = ['CacheSnapshot', 'UpdateResult', 'UsageCache']
+__all__ = [
+    'CacheSnapshot', 'DashboardCache', 'DashboardSnapshot', 'DashboardUpdateResult',
+    'ProviderClient', 'UpdateResult', 'UsageCache',
+]
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +45,16 @@ class CacheSnapshot:
     last_success_time: float | None
     refreshing: bool
     last_error: str | None
+    version: int
+    provider_id: str = 'claude'
+
+
+@dataclass(frozen=True)
+class DashboardSnapshot:
+    """Immutable snapshot containing all provider cache snapshots."""
+
+    providers: dict[str, CacheSnapshot]
+    primary_provider: str
     version: int
 
 
@@ -53,6 +75,47 @@ class UpdateResult:
     token_refresh: RefreshResult | None = None
 
 
+@dataclass(frozen=True)
+class DashboardUpdateResult:
+    """Result of updating every provider cache."""
+
+    primary: UpdateResult
+    providers: dict[str, UpdateResult]
+
+
+@dataclass(frozen=True)
+class ProviderClient:
+    """Provider-specific functions used by ``UsageCache``."""
+
+    provider_id: str
+    fetch_usage: Any
+    fetch_profile: Any
+    read_access_token: Any
+    refresh_auth_token: Any
+
+
+def _primary_client() -> ProviderClient:
+    """Build the default client from patchable module-level functions."""
+    return ProviderClient(
+        provider_id=USAGE_PROVIDER,
+        fetch_usage=lambda: fetch_usage(),
+        fetch_profile=lambda: fetch_profile(),
+        read_access_token=lambda: read_access_token(),
+        refresh_auth_token=lambda: refresh_auth_token(),
+    )
+
+
+def _client_for_provider(provider_id: str) -> ProviderClient:
+    """Build a client for an explicit provider."""
+    return ProviderClient(
+        provider_id=provider_id,
+        fetch_usage=lambda: fetch_usage_for_provider(provider_id),
+        fetch_profile=lambda: fetch_profile_for_provider(provider_id),
+        read_access_token=lambda: read_access_token_for_provider(provider_id),
+        refresh_auth_token=lambda: refresh_auth_token_for_provider(provider_id),
+    )
+
+
 class UsageCache:
     """Thread-safe cache managing API data, cooldown, and error state.
 
@@ -60,7 +123,8 @@ class UsageCache:
     of calling ``fetch_usage()`` directly.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, client: ProviderClient | None = None) -> None:
+        self._client = client or _primary_client()
         self._lock = threading.Lock()
         self._state_lock = threading.Lock()
         self._profile_lock = threading.Lock()
@@ -123,6 +187,7 @@ class UsageCache:
                 refreshing=self._refreshing,
                 last_error=self._last_error,
                 version=self._version,
+                provider_id=self._client.provider_id,
             )
 
     # Public methods
@@ -133,22 +198,22 @@ class UsageCache:
         Acquires ``_lock`` around the HTTP call to prevent concurrent
         API requests with ``update()``.
         """
-        current_token = read_access_token()
+        current_token = self._client.read_access_token()
         if self._profile is not None and self._profile_token == current_token:
             return
 
         with self._profile_lock:
-            current_token = read_access_token()
+            current_token = self._client.read_access_token()
             if self._profile is not None and self._profile_token == current_token:
                 return
-            log.info('fetch_profile started')
+            log.info('fetch_profile started (%s)', self._client.provider_id)
             with self._lock:
-                profile = fetch_profile()
+                profile = self._client.fetch_profile()
             with self._state_lock:
                 self._profile = profile
                 self._profile_token = current_token
                 self._version += 1
-            log.info('fetch_profile -> %s', 'OK' if profile else 'failed')
+            log.info('fetch_profile -> %s (%s)', 'OK' if profile else 'failed', self._client.provider_id)
 
     def update(self) -> UpdateResult:
         """Fetch usage data with lock and cooldown protection.
@@ -182,7 +247,7 @@ class UsageCache:
             return UpdateResult(data=None)
 
         if self._last_failed_token is not None:
-            if read_access_token() == self._last_failed_token:
+            if self._client.read_access_token() == self._last_failed_token:
                 log.debug('update skipped (token unchanged after auth failure)')
                 return UpdateResult(data=None)
             self._last_failed_token = None
@@ -201,9 +266,9 @@ class UsageCache:
 
     def _fetch_and_process(self) -> UpdateResult:
         """Fetch usage data and process the response."""
-        token_before = read_access_token()
-        log.info('fetch_usage started')
-        data = fetch_usage()
+        token_before = self._client.read_access_token()
+        log.info('fetch_usage started (%s)', self._client.provider_id)
+        data = self._client.fetch_usage()
 
         if 'error' in data:
             self._record_error(data)
@@ -219,14 +284,18 @@ class UsageCache:
 
             token_refresh = None
             if data.get('auth_error'):
-                log.warning('fetch_usage -> auth error, attempting token refresh')
-                token_refresh = self._try_token_refresh(token_before)
-                if token_refresh is not None and self._last_error is None:
-                    # Token refresh succeeded and retry was successful
-                    return UpdateResult(data=self._usage, token_refresh=token_refresh)
-                if token_refresh is None:
-                    # Refresh failed or token unchanged - block this token
+                if data.get('refresh_attempted'):
+                    log.warning('fetch_usage -> auth error, provider refresh already failed')
                     self._last_failed_token = token_before
+                else:
+                    log.warning('fetch_usage -> auth error, attempting token refresh')
+                    token_refresh = self._try_token_refresh(token_before)
+                    if token_refresh is not None and self._last_error is None:
+                        # Token refresh succeeded and retry was successful
+                        return UpdateResult(data=self._usage, token_refresh=token_refresh)
+                    if token_refresh is None:
+                        # Refresh failed or token unchanged - block this token
+                        self._last_failed_token = token_before
             elif not data.get('rate_limited'):
                 log.warning('fetch_usage -> error: %s', data['error'])
 
@@ -237,9 +306,14 @@ class UsageCache:
 
         pct_5h = (data.get('five_hour') or {}).get('utilization')
         pct_7d = (data.get('seven_day') or {}).get('utilization')
-        log.info('fetch_usage -> OK (5h: %s%%, 7d: %s%%)', pct_5h if pct_5h is not None else '?', pct_7d if pct_7d is not None else '?')
-        self._record_success(data)
-        return UpdateResult(data=data)
+        log.info(
+            'fetch_usage -> OK (%s, 5h: %s%%, 7d: %s%%)',
+            self._client.provider_id,
+            pct_5h if pct_5h is not None else '?',
+            pct_7d if pct_7d is not None else '?',
+        )
+        success_data = self._record_success(data)
+        return UpdateResult(data=success_data)
 
     def _record_error(self, data: dict[str, Any], *, count: bool = True) -> None:
         """Apply common state updates after a failed API response.
@@ -260,22 +334,29 @@ class UsageCache:
                 error += f'\n{server_msg}'
             self._last_error = error
 
-    def _record_success(self, data: dict[str, Any]) -> None:
+    def _record_success(self, data: dict[str, Any]) -> dict[str, Any]:
         """Apply common state updates after a successful API response."""
         # _usage is always reassigned (never mutated in place), so existing
         # CacheSnapshot references remain valid after this update.
+        cleaned_data = dict(data)
+        profile = cleaned_data.pop('__profile', None)
         with self._state_lock:
             self._consecutive_errors = 0
             self._last_error = None
             self._last_success_time = time.time()
             self._rate_limit_until = 0
             self._last_failed_token = None
-            self._usage = data
+            if isinstance(profile, dict):
+                self._profile = profile
+                self._profile_token = self._client.read_access_token()
+            self._usage = cleaned_data
             self._refreshing = False
             self._version += 1
 
+        return cleaned_data
+
     def _try_token_refresh(self, token_before: str | None) -> RefreshResult | None:
-        """Attempt to refresh the OAuth token via ``claude update``.
+        """Attempt to refresh the OAuth token for the configured provider.
 
         Parameters
         ----------
@@ -289,18 +370,18 @@ class UsageCache:
             The refresh outcome, or ``None`` if the CLI is not available
             or the token didn't change.
         """
-        result = refresh_token()
+        result = self._client.refresh_auth_token()
         if not result.success:
             log.info('token refresh failed: %s', result.error)
             return None
 
-        if read_access_token() == token_before:
+        if self._client.read_access_token() == token_before:
             log.info('token refresh succeeded but token unchanged')
             return None
 
         # Token changed - retry the API call
         log.info('token changed, retrying fetch_usage')
-        data = fetch_usage()
+        data = self._client.fetch_usage()
         if 'error' not in data:
             log.info('retry -> OK')
             self._record_success(data)
@@ -312,3 +393,67 @@ class UsageCache:
         self._record_error(data, count=False)
 
         return result
+
+
+class DashboardCache:
+    """Provider-aware cache for the desktop panel."""
+
+    PROVIDER_ORDER = ('codex', 'claude')
+
+    def __init__(self, primary_provider: str = USAGE_PROVIDER) -> None:
+        self.primary_provider = primary_provider if primary_provider in self.PROVIDER_ORDER else 'claude'
+        self.caches = {
+            provider_id: UsageCache(_client_for_provider(provider_id))
+            for provider_id in self.PROVIDER_ORDER
+        }
+
+    @property
+    def primary(self) -> UsageCache:
+        """Return the cache used by tray, alerts, and event commands."""
+        return self.caches[self.primary_provider]
+
+    @property
+    def snapshot(self) -> DashboardSnapshot:
+        """Return a consistent multi-provider snapshot."""
+        provider_snapshots = {
+            provider_id: cache.snapshot
+            for provider_id, cache in self.caches.items()
+        }
+        version = sum(snapshot.version for snapshot in provider_snapshots.values())
+        return DashboardSnapshot(
+            providers=provider_snapshots,
+            primary_provider=self.primary_provider,
+            version=version,
+        )
+
+    def ensure_profiles(self) -> None:
+        """Fetch profiles for all providers without letting one failure block another."""
+        for cache in self.caches.values():
+            try:
+                cache.ensure_profile()
+            except Exception:
+                log.exception('provider profile refresh failed')
+
+    def update_all(self) -> DashboardUpdateResult:
+        """Refresh every provider and return the primary result separately."""
+        results: dict[str, UpdateResult] = {}
+
+        for provider_id in self._update_order():
+            try:
+                results[provider_id] = self.caches[provider_id].update()
+            except Exception as exc:
+                log.exception('provider update failed (%s)', provider_id)
+                results[provider_id] = UpdateResult(data={'error': str(exc)})
+
+        return DashboardUpdateResult(
+            primary=results.get(self.primary_provider, UpdateResult(data=None)),
+            providers=results,
+        )
+
+    def _update_order(self) -> list[str]:
+        """Return primary provider first, then remaining providers."""
+        ordered = [self.primary_provider]
+        for provider_id in self.PROVIDER_ORDER:
+            if provider_id not in ordered:
+                ordered.append(provider_id)
+        return ordered

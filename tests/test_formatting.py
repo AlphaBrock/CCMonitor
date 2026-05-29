@@ -776,6 +776,21 @@ class TestFormatTooltip(unittest.TestCase):
         data = {'five_hour': {'utilization': 50.0, 'resets_at': ''}}
         self.assertEqual(format_tooltip(data), 'Claude Usage')
 
+    @patch('src.presentation.formatting.USAGE_PROVIDER', 'codex')
+    @patch('src.presentation.formatting.ACTIVE_LANG', 'en')
+    @patch('src.presentation.formatting.time_until', return_value='')
+    def test_codex_provider_title(self, _mock_tu):
+        """Codex provider changes the tooltip title."""
+        data = {'seven_day': {'utilization': 25.0, 'resets_at': ''}}
+        self.assertEqual(format_tooltip(data), 'Codex Usage\n7d: 25%')
+
+    @patch('src.presentation.formatting.USAGE_PROVIDER', 'codex')
+    @patch('src.presentation.formatting.ACTIVE_LANG', 'en')
+    def test_codex_auth_error_text(self):
+        """Codex provider auth errors do not mention Claude Code."""
+        data = {'error': 'Unauthorized', 'auth_error': True}
+        self.assertEqual(format_tooltip(data), 'Codex Session Expired\nRun codex to log in again.')
+
 
 # ---------------------------------------------------------------------------
 # tooltip length - Windows limits tooltip text to 127 characters

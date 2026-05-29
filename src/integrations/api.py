@@ -2,10 +2,11 @@
 API Client
 ===========
 
-Reads Claude Code OAuth credentials and communicates with the
-Anthropic API.  This is the only module that handles credentials.
+Reads usage-provider OAuth credentials and communicates with the
+provider APIs.  This is the only module that handles credentials.
 
-Network communication exclusively with ``api.anthropic.com``.
+Network communication is limited to ``api.anthropic.com``,
+``auth.openai.com``, and ``chatgpt.com``.
 Credentials used only in HTTP Authorization headers.
 """
 from __future__ import annotations
@@ -17,9 +18,25 @@ from typing import Any
 
 import requests
 
+from src.integrations.codex_api import (
+    api_headers as codex_api_headers,
+    fetch_codex_profile,
+    fetch_codex_usage,
+    read_codex_access_token,
+    refresh_codex_token,
+)
+from src.integrations.claude_cli import RefreshResult
 from src.presentation.i18n import T
+from src.presentation.settings import USAGE_PROVIDER
 
-__all__ = ['API_URL_USAGE', 'API_URL_PROFILE', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CREDENTIALS', 'read_access_token', 'api_headers', 'fetch_usage', 'fetch_profile']
+__all__ = [
+    'API_URL_USAGE', 'API_URL_PROFILE', 'CLAUDE_CONFIG_DIR', 'CLAUDE_CREDENTIALS',
+    'api_headers', 'api_headers_for_provider', 'auth_warning_text',
+    'fetch_claude_profile', 'fetch_claude_usage', 'fetch_profile', 'fetch_usage',
+    'fetch_profile_for_provider', 'fetch_usage_for_provider',
+    'read_access_token', 'read_access_token_for_provider', 'read_claude_access_token',
+    'refresh_auth_token', 'refresh_auth_token_for_provider',
+]
 
 # API endpoints & credentials
 API_URL_USAGE = 'https://api.anthropic.com/api/oauth/usage'
@@ -30,6 +47,20 @@ _FALLBACK_USER_AGENT = 'claude-code/2.1.85'
 
 
 def read_access_token() -> str | None:
+    """Read the current access token for the configured usage provider."""
+    return read_access_token_for_provider(USAGE_PROVIDER)
+
+
+def read_access_token_for_provider(provider: str) -> str | None:
+    """Read the current access token for a specific provider."""
+    if provider == 'codex':
+        return read_codex_access_token()
+    if provider == 'claude':
+        return read_claude_access_token()
+    return None
+
+
+def read_claude_access_token() -> str | None:
     """Read the current access token from the Claude credentials file."""
     if not CLAUDE_CREDENTIALS.exists():
         return None
@@ -42,8 +73,22 @@ def read_access_token() -> str | None:
 
 
 def api_headers() -> dict[str, str] | None:
+    """Return auth headers for the configured usage provider, or None."""
+    return api_headers_for_provider(USAGE_PROVIDER)
+
+
+def api_headers_for_provider(provider: str) -> dict[str, str] | None:
+    """Return auth headers for a specific provider, or None."""
+    if provider == 'codex':
+        return codex_api_headers()
+    if provider == 'claude':
+        return claude_api_headers()
+    return None
+
+
+def claude_api_headers() -> dict[str, str] | None:
     """Return auth headers for the Anthropic OAuth API, or None."""
-    token = read_access_token()
+    token = read_claude_access_token()
     if not token:
         return None
 
@@ -56,8 +101,30 @@ def api_headers() -> dict[str, str] | None:
 
 
 def fetch_usage() -> dict[str, Any]:
-    """Fetch usage data from the Anthropic OAuth usage API."""
+    """Fetch usage data from the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return fetch_codex_usage()
+
     headers = api_headers()
+    return _fetch_claude_usage_with_headers(headers)
+
+
+def fetch_usage_for_provider(provider: str) -> dict[str, Any]:
+    """Fetch usage data from a specific provider."""
+    if provider == 'codex':
+        return fetch_codex_usage()
+    if provider == 'claude':
+        return fetch_claude_usage()
+    return {'error': T['http_error'].format(code='?')}
+
+
+def fetch_claude_usage() -> dict[str, Any]:
+    """Fetch Claude usage data directly from the Anthropic OAuth API."""
+    return _fetch_claude_usage_with_headers(claude_api_headers())
+
+
+def _fetch_claude_usage_with_headers(headers: dict[str, str] | None) -> dict[str, Any]:
+    """Fetch Claude usage data with precomputed headers."""
     if not headers:
         return {'error': T['no_token']}
 
@@ -89,8 +156,30 @@ def fetch_usage() -> dict[str, Any]:
 
 
 def fetch_profile() -> dict[str, Any] | None:
-    """Fetch account profile from the Anthropic OAuth profile API."""
+    """Fetch account profile from the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return fetch_codex_profile()
+
     headers = api_headers()
+    return _fetch_claude_profile_with_headers(headers)
+
+
+def fetch_profile_for_provider(provider: str) -> dict[str, Any] | None:
+    """Fetch account profile from a specific provider."""
+    if provider == 'codex':
+        return fetch_codex_profile()
+    if provider == 'claude':
+        return fetch_claude_profile()
+    return None
+
+
+def fetch_claude_profile() -> dict[str, Any] | None:
+    """Fetch Claude account profile directly from the Anthropic OAuth API."""
+    return _fetch_claude_profile_with_headers(claude_api_headers())
+
+
+def _fetch_claude_profile_with_headers(headers: dict[str, str] | None) -> dict[str, Any] | None:
+    """Fetch Claude profile with precomputed headers."""
     if not headers:
         return None
 
@@ -102,7 +191,49 @@ def fetch_profile() -> dict[str, Any] | None:
         return None
 
 
+def refresh_auth_token() -> RefreshResult:
+    """Refresh the OAuth token for the configured usage provider."""
+    return refresh_auth_token_for_provider(USAGE_PROVIDER)
+
+
+def refresh_auth_token_for_provider(provider: str) -> RefreshResult:
+    """Refresh the OAuth token for a specific provider."""
+    if provider == 'codex':
+        return refresh_codex_token()
+
+    from src.integrations.claude_cli import refresh_token
+
+    return refresh_token()
+
+
+def auth_warning_text() -> tuple[str, str]:
+    """Return the startup no-token notification body and title."""
+    if USAGE_PROVIDER == 'codex':
+        return (
+            '未找到 Codex OAuth 令牌。\n请先运行 codex 登录。'
+            if _is_chinese_locale()
+            else 'No Codex OAuth token found.\nRun codex to log in first.',
+            _provider_popup_title(),
+        )
+
+    return f"{T['warn_no_token']}\n{T['warn_login']}", T['popup_title']
+
+
 # Helpers
+
+
+def _provider_popup_title() -> str:
+    """Return popup title for the configured usage provider."""
+    if USAGE_PROVIDER == 'codex':
+        return 'Codex 用量' if _is_chinese_locale() else 'Codex Usage'
+    return T['popup_title']
+
+
+def _is_chinese_locale() -> bool:
+    """Return whether the active UI locale is Chinese."""
+    from src.presentation.i18n import ACTIVE_LANG
+
+    return ACTIVE_LANG.startswith('zh')
 
 
 def _user_agent() -> str:

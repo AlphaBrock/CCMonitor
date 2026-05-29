@@ -1,6 +1,6 @@
 # Automatic Update Check
 
-The app itself never contacts GitHub - it communicates exclusively with `api.anthropic.com`. Update checking is available as an optional PowerShell script that you run via [event commands](event-commands.md). This keeps the security model intact while giving you full control over when and how updates are checked.
+Routine usage polling only contacts the selected provider endpoints. This optional PowerShell script lets you run a fully user-controlled GitHub release check via [event commands](event-commands.md), separate from usage polling.
 
 The script queries the GitHub Releases API, compares the latest version against the running app version, and shows a Windows toast notification if a newer release exists. Clicking the notification opens the download page in your browser. If no update is available or the network is unreachable, nothing happens.
 

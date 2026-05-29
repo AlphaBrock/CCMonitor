@@ -80,12 +80,14 @@ const COLORS = {
 };
 
 const T = {
-    title: 'Usage Monitor for Claude',
+    title: 'Usage Monitor',
+    all: 'All',
     account: 'ACCOUNT',
     email: 'Email',
     plan: 'Plan',
     usage: 'USAGE',
     extra_usage: 'EXTRA USAGE',
+    local_metrics: 'Local logs',
     status_updated_s: 'Updated {s}s ago',
     status_updated: 'Updated {duration} ago',
     status_next_update: 'Next update in {duration}',
@@ -95,47 +97,80 @@ const T = {
     duration_s: '{s}s',
 };
 
+function provider(id, title, plan, usage, status, extra = null) {
+    return {
+        id,
+        title,
+        icon: id === 'codex' ? '◌' : '✺',
+        profile: { email: '', plan },
+        usage,
+        extra,
+        metrics: {
+            items: [
+                { label: 'Today', value: id === 'codex' ? '—' : '$256.92' },
+                { label: '30d cost', value: id === 'codex' ? '$164.12' : '$1,958.01' },
+                { label: '30d tokens', value: id === 'codex' ? '212.7M' : '7M' },
+                { label: 'Latest tokens', value: id === 'codex' ? '—' : '775K' },
+                { label: 'Top model', value: id === 'codex' ? 'gpt-5.5' : 'claude-opus-4-6' },
+            ],
+            note: 'Estimated from local logs; totals may differ from your bill.',
+        },
+        status,
+    };
+}
+
 const PRESETS = {
     full: {
-        profile: { email: 'user@example.com', plan: 'Max (Team)' },
-        usage: [
-            { label: 'Session (5h)', pct_text: '42%', tone: 'normal', bar_text: '████████░░░░░░░░░░░░', reset_text: 'Resets in 2h 30m (14:30)' },
-            { label: 'Weekly (7d)', pct_text: '76%', tone: 'mid', bar_text: '███████████████░░░░░', reset_text: 'Resets on Sat, 12:00' },
+        providers: [
+            provider('codex', 'Codex', 'ChatGPT Plus', [
+                { label: 'Session', pct_text: '11%', tone: 'normal', bar_text: '██░░░░░░░░░░░░░░░░░░', reset_text: 'Resets in 4h 6m' },
+                { label: 'Weekly', pct_text: '34%', tone: 'normal', bar_text: '███████░░░░░░░░░░░░░', reset_text: 'Resets in 2d 0h' },
+            ], () => ({ last_success_time: now() - 12, next_poll_time: now() + 20, refreshing: false, error: null })),
+            provider('claude', 'Claude', 'Claude AI', [
+                { label: 'Session (5h)', pct_text: '0%', tone: 'normal', bar_text: '░░░░░░░░░░░░░░░░░░░░', reset_text: '' },
+                { label: 'Weekly', pct_text: '10%', tone: 'normal', bar_text: '██░░░░░░░░░░░░░░░░░░', reset_text: 'Resets in 6d 13h' },
+            ], () => ({ last_success_time: now() - 12, next_poll_time: now() + 20, refreshing: false, error: null })),
         ],
-        extra: { pct_text: '23%', tone: 'normal', bar_text: '█████░░░░░░░░░░░░░░░', spent_text: '$4.60 / $20.00 spent' },
-        status: () => ({ last_success_time: now() - 12, next_poll_time: now() + 20, refreshing: false, error: null }),
+        primary_provider: 'claude',
     },
     minimal: {
-        profile: null,
-        usage: [
-            { label: 'Session (5h)', pct_text: '10%', tone: 'normal', bar_text: '██░░░░░░░░░░░░░░░░░░', reset_text: 'Resets in 4h 50m (17:00)' },
+        providers: [
+            provider('codex', 'Codex', '', [], { text: 'No Codex OAuth token.', is_error: true }),
+            provider('claude', 'Claude', 'Claude AI', [
+                { label: 'Session (5h)', pct_text: '10%', tone: 'normal', bar_text: '██░░░░░░░░░░░░░░░░░░', reset_text: 'Resets in 4h 50m' },
+            ], () => ({ last_success_time: now() - 90, next_poll_time: now() + 90, refreshing: false, error: null })),
         ],
-        extra: null,
-        status: () => ({ last_success_time: now() - 90, next_poll_time: now() + 90, refreshing: false, error: null }),
+        primary_provider: 'claude',
     },
     danger: {
-        profile: { email: 'user@example.com', plan: 'Max' },
-        usage: [
-            { label: 'Session (5h)', pct_text: '101%', tone: 'danger', bar_text: '████████████████████', reset_text: 'Resets in 12m (12:12)' },
-            { label: 'Weekly (7d)', pct_text: '89%', tone: 'warn', bar_text: '██████████████████░░', reset_text: 'Resets tomorrow, 08:00' },
+        providers: [
+            provider('codex', 'Codex', 'ChatGPT Plus', [
+                { label: 'Session', pct_text: '101%', tone: 'danger', bar_text: '████████████████████', reset_text: 'Resets in 12m' },
+                { label: 'Weekly', pct_text: '89%', tone: 'warn', bar_text: '██████████████████░░', reset_text: 'Resets tomorrow' },
+            ], () => ({ last_success_time: now() - 300, next_poll_time: now() + 30, refreshing: false, error: 'Could not connect to Codex usage API.' })),
+            provider('claude', 'Claude', 'Claude AI', [
+                { label: 'Session (5h)', pct_text: '95%', tone: 'warn', bar_text: '███████████████████░', reset_text: 'Resets in 12m' },
+            ], () => ({ last_success_time: now() - 300, next_poll_time: now() + 30, refreshing: false, error: null })),
         ],
-        extra: { pct_text: '95%', tone: 'warn', bar_text: '███████████████████░', spent_text: '$19.00 / $20.00 spent' },
-        status: () => ({ last_success_time: now() - 300, next_poll_time: now() + 30, refreshing: false, error: 'Could not connect to Anthropic API.' }),
+        primary_provider: 'claude',
     },
     refreshing: {
-        profile: { email: 'user@example.com', plan: 'Max (Team)' },
-        usage: [
-            { label: 'Session (5h)', pct_text: '42%', tone: 'normal', bar_text: '████████░░░░░░░░░░░░', reset_text: 'Resets in 2h 30m (14:30)' },
-            { label: 'Weekly (7d)', pct_text: '51%', tone: 'mid', bar_text: '██████████░░░░░░░░░░', reset_text: 'Resets on Sat, 12:00' },
+        providers: [
+            provider('codex', 'Codex', 'ChatGPT Plus', [
+                { label: 'Session', pct_text: '42%', tone: 'normal', bar_text: '████████░░░░░░░░░░░░', reset_text: 'Resets in 2h 30m' },
+            ], () => ({ last_success_time: now() - 180, next_poll_time: null, refreshing: true, error: null })),
+            provider('claude', 'Claude', 'Claude AI', [
+                { label: 'Weekly', pct_text: '51%', tone: 'mid', bar_text: '██████████░░░░░░░░░░', reset_text: 'Resets on Sat' },
+            ], () => ({ last_success_time: now() - 180, next_poll_time: null, refreshing: true, error: null })),
         ],
-        extra: null,
-        status: () => ({ last_success_time: now() - 180, next_poll_time: null, refreshing: true, error: null }),
+        primary_provider: 'claude',
     },
     loading: {
-        profile: null,
-        usage: [],
-        extra: null,
-        status: { text: 'Refreshing...', is_error: false, refreshing: true },
+        providers: [
+            provider('codex', 'Codex', '', [], { text: 'Refreshing...', is_error: false, refreshing: true }),
+            provider('claude', 'Claude', '', [], { text: 'Refreshing...', is_error: false, refreshing: true }),
+        ],
+        primary_provider: 'claude',
     },
 };
 
@@ -146,8 +181,17 @@ let previewPinned = false;
 
 function resolvePreset(name) {
     const preset = PRESETS[name];
-    const status = typeof preset.status === 'function' ? preset.status() : preset.status;
-    return { ...structuredClone({ ...preset, status: null }), status };
+    return {
+        primary_provider: preset.primary_provider,
+        providers: preset.providers.map((item) => ({
+            ...item,
+            profile: item.profile ? { ...item.profile } : null,
+            usage: item.usage.map((entry) => ({ ...entry })),
+            extra: item.extra ? { ...item.extra } : null,
+            metrics: structuredClone(item.metrics),
+            status: typeof item.status === 'function' ? item.status() : { ...item.status },
+        })),
+    };
 }
 
 function applyPreset(name) {
@@ -168,17 +212,13 @@ function loadPreset(name) {
 function randomize() {
     location.hash = 'randomize';
     const data = resolvePreset('full');
-    for (const entry of data.usage) {
-        const percent = Math.round(Math.random() * 120);
-        entry.pct_text = `${percent}%`;
-        entry.bar_text = buildBar(percent);
-        entry.tone = toneFor(percent);
-    }
-    if (data.extra) {
-        const percent = Math.round(Math.random() * 120);
-        data.extra.pct_text = `${percent}%`;
-        data.extra.bar_text = buildBar(percent);
-        data.extra.tone = toneFor(percent);
+    for (const provider of data.providers) {
+        for (const entry of provider.usage) {
+            const percent = Math.round(Math.random() * 120);
+            entry.pct_text = `${percent}%`;
+            entry.bar_text = buildBar(percent);
+            entry.tone = toneFor(percent);
+        }
     }
     popupWindow().updateData(data);
 }

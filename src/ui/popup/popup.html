@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="popup.css?v=20260522e">
+<link rel="stylesheet" href="popup.css?v=20260529d">
 </head>
 <body>
 <header id="windowHeader" class="window-header pywebview-drag-region">
@@ -27,37 +27,15 @@
     </div>
 </header>
 
-<main>
-    <section id="accountSection">
-        <h2 id="headingAccount"></h2>
-        <dl class="meta-list">
-            <div id="emailRow">
-                <dt id="labelEmail"></dt>
-                <dd id="emailValue"></dd>
-            </div>
-            <div id="planRow">
-                <dt id="labelPlan"></dt>
-                <dd id="planValue"></dd>
-            </div>
-        </dl>
-    </section>
+<nav id="providerSwitcher" class="provider-switcher" aria-label="Provider view"></nav>
 
-    <section id="usageSection">
-        <h2 id="headingUsage"></h2>
-        <div id="usageRows" class="usage-list"></div>
-    </section>
-
-    <section id="extraSection">
-        <h2 id="headingExtraUsage"></h2>
-        <div id="extraRow"></div>
-    </section>
-
-    <footer id="statusSection">
-        <span id="statusText"></span>
-        <span id="appVersion"></span>
-    </footer>
+<main id="providerCards" class="provider-cards">
 </main>
 
-<script src="popup.js?v=20260522e"></script>
+<footer id="appFooter" class="app-footer">
+    <span id="appVersion"></span>
+</footer>
+
+<script src="popup.js?v=20260529d"></script>
 </body>
 </html>

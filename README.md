@@ -13,12 +13,12 @@
 ## 功能特性
 
 - **免安装** - 单个 EXE 文件（约 12.5 MB），无需安装、无 Electron、无运行时依赖。下载后放在任意位置即可运行，卸载只需删除文件
-- **零配置** - 通过现有 Claude Code 登录自动认证，无需 API 密钥或手动输入令牌
-- **实时托盘图标** 带两个[可配置](docs/configuration.md#tray-icon-bars)进度条（默认显示会话和周用量），[可配置工具提示](docs/configuration.md#tooltip-fields)、百分比显示，以及适配浅色和深色任务栏的主题感知颜色
-- **桌面详情窗口** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。窗口聚焦于最常查看的两个配额（`5h` 和 `7d`），加上额外用量、重置倒计时以及数据过时指示器
+- **零配置** - 默认以现有 Claude Code 登录作为托盘和提醒的主数据源；如本机已登录 Codex，详情窗口会同时显示 Codex 用量，用量查询无需 API 密钥
+- **实时托盘图标** 带两个[可配置](docs/configuration.md#tray-icon-bars)进度条（默认显示会话和周用量），[可配置工具提示](docs/configuration.md#tooltip-fields)、百分比显示，可通过右键菜单选择托盘显示哪个 provider 的指标（Auto 悬停提示同时显示 Codex 和 Claude，图标进度条仍使用主 provider），以及适配浅色和深色任务栏的主题感知颜色
+- **桌面详情窗口** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。窗口提供 All / Codex / Claude 视图，同时显示两边的 `5h` / `7d` 配额、本地 30 天成本与 Token 估算、重置倒计时以及数据过时指示器
 - **智能提醒** - 按配额类型可配置阈值通知，时间感知模式仅在使用超过已过时间比例时才提醒。接近耗尽的配额刷新后发送重置通知
 - **[事件命令](docs/event-commands.md)** - 在配额重置、使用达到阈值或应用启动时运行自定义 Shell 命令。可发送手机推送通知、恢复 AI 代理、自动开始新的 5 小时会话、播放提示音或触发任何自定义工作流
-- **自动令牌刷新** - OAuth 会话过期时后台运行 `claude update` 自动续期。如果安装了 CLI 更新会显示通知
+- **自动令牌刷新** - Claude 模式在 OAuth 会话过期时后台运行 `claude update`；Codex 模式直接刷新本地 ChatGPT OAuth 令牌
 - **自适应轮询** - 活跃使用时加速轮询，电脑空闲或锁定时暂停，在配额即将重置时对齐轮询，速率限制错误时自动退避
 - **13 种语言**（英语、德语、法语、西班牙语、葡萄牙语、意大利语、日语、韩语、印地语、印尼语、简体中文、繁体中文、乌克兰语）- 自动检测 Windows 显示语言，或通过右键菜单手动切换
 - **[可自定义](docs/configuration.md)** - 可通过 JSON 设置文件覆盖轮询间隔、颜色、提醒阈值等
@@ -27,14 +27,14 @@
 
 ## 安全性与透明度
 
-本工具会处理您的 Claude Code OAuth 令牌，因此您应当能够验证其安全性。代码库刻意设计为易于审计：
+本工具会处理您的 Claude Code 或 Codex OAuth 令牌，因此您应当能够验证其安全性。代码库刻意设计为易于审计：
 
-- **单一网络目标** - 仅与 `api.anthropic.com` 通信，不连接其他主机
+- **固定网络目标** - Claude 模式仅与 `api.anthropic.com` 通信；Codex 模式仅与 `auth.openai.com` 和 `chatgpt.com` 通信
 - **凭据本地保存** - OAuth 令牌仅用于 HTTP Authorization 头，从不记录日志、存储到其他位置或传输给第三方
-- **只读** - 应用从不向磁盘写入文件
+- **最小写入** - 应用不写入自身状态文件；Codex OAuth 刷新成功时只会写回 Codex 自己的 `auth.json`
 - **无动态代码执行** - 不使用 `eval()`、`exec()`、`compile()` 或动态导入
 - **无混淆** - 无编码字符串、无隐藏 URL、无压缩逻辑
-- **模块化架构** - 小而专注的模块，安全关键代码（凭据、API 调用）隔离在单个文件中（[`api.py`](src/integrations/api.py)）
+- **模块化架构** - 小而专注的模块，安全关键代码（凭据、API 调用）隔离在 provider 模块中（[`api.py`](src/integrations/api.py)、[`codex_api.py`](src/integrations/codex_api.py)）
 - **最小运行时依赖** - 仅四个知名包：[requests](https://pypi.org/project/requests/)、[Pillow](https://pypi.org/project/pillow/)、[pystray](https://pypi.org/project/pystray/)、[pywebview](https://pypi.org/project/pywebview/)
 
 ---
@@ -42,10 +42,11 @@
 ## 系统要求
 
 - **Windows 10 或 Windows 11**（64 位）
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** 已安装并登录（CLI、VS Code 扩展或 JetBrains 插件均可）。应用读取 Claude Code 本地存储的 OAuth 令牌（`~/.claude/.credentials.json`）。如果设置了 `CLAUDE_CONFIG_DIR`，应用使用该目录。
+- **Claude 数据**：已安装并登录 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（CLI、VS Code 扩展或 JetBrains 插件均可）。应用读取 Claude Code 本地存储的 OAuth 令牌（`~/.claude/.credentials.json`）。如果设置了 `CLAUDE_CONFIG_DIR`，应用使用该目录。
+- **Codex 数据**：应用读取 `%CODEX_HOME%\auth.json` 或 `~\.codex\auth.json` 中的 ChatGPT/Codex OAuth 令牌。`OPENAI_API_KEY` 不能用于查询 Codex 用量。`usage_provider` 决定提醒、事件命令和 Auto 图标进度条使用哪个 provider 作为主数据源，`tray_provider` 可单独控制托盘显示。
 
 > [!TIP]
-> 令牌过期时，应用会自动运行 `claude update` 刷新令牌。如果令牌完全缺失，应用会显示通知和 "!" 图标 - 登录 Claude Code 后监控器会自动检测到。
+> Claude 令牌过期时，应用会自动运行 `claude update`；Codex 令牌超过 8 天会直接刷新 OAuth token。如果令牌完全缺失，应用会显示通知和 "!" 图标 - 登录对应工具后监控器会自动检测到。
 
 ---
 
@@ -62,7 +63,8 @@
 | **悬停**在托盘图标上 | 工具提示显示 5h 和 7d 用量百分比及重置时间 |
 | **应用启动** | 桌面详情窗口立即在托盘附近打开 |
 | **左键点击**托盘图标 | 显示桌面详情窗口并置顶 |
-| **右键点击**托盘图标 | 右键菜单：显示窗口、开机启动、语言切换、检查更新、测试事件命令、重新启动、GitHub 链接、退出 |
+| **All / Codex / Claude** | 在双 provider 汇总和单独 provider 视图之间切换 |
+| **右键点击**托盘图标 | 右键菜单：显示窗口、Provider 显示选择、开机启动、语言切换、检查更新、测试事件命令、重新启动、GitHub 链接、退出 |
 | **PIN** 按钮 | 保持桌面窗口始终置顶 |
 | **X** 按钮或 **Escape** | 隐藏桌面窗口到托盘 |
 
@@ -93,6 +95,7 @@ Windows 可能默认隐藏新的托盘图标。要保持图标始终可见：
 
 ```json
 {
+  "usage_provider": "claude",
   "poll_interval": 180,
   "bar_fg": "#00cc66",
   "bar_fg_warn": "#ff6600"
@@ -205,10 +208,10 @@ GitHub Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/rel
 
 新功能应遵循现有架构。指南要点：
 
-- 安全关键代码（凭据、API 调用）隔离在 [`api.py`](src/integrations/api.py) 中
+- 安全关键代码（凭据、API 调用）隔离在 [`api.py`](src/integrations/api.py) 和 provider 模块中
 - 所有面向用户的更改需要更新 [`CHANGELOG.md`](CHANGELOG.md)、[`README.md`](README.md) 和 [`docs/configuration.md`](docs/configuration.md)（如适用）
 - 测试是必需的 - 提交前运行 `python -m unittest discover -s tests`
-- 应用是只读的，从不向磁盘写入文件
+- 应用不写入自身状态文件；Codex OAuth 刷新成功时只会写回 Codex 自己的 `auth.json`
 
 </details>
 

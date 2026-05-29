@@ -13,12 +13,12 @@ A native Windows tray app that shows your Claude usage at a glance - lightweight
 ## Features
 
 - **Portable** - single EXE (~12.5 MB), no installation, no Electron, no runtime required. Download, place anywhere, run. To uninstall, delete the file
-- **Zero configuration** - authenticates through your existing Claude Code login, no API key or manual token entry needed
-- **Live tray icon** with two [configurable](docs/configuration.md#tray-icon-bars) progress bars (session + weekly by default), [configurable tooltip](docs/configuration.md#tooltip-fields), percentage display, and theme-aware colors for light and dark taskbars
-- **Desktop detail window** - launches visible on startup, stays open until you hide it, supports left-drag repositioning, and can be pinned above other windows. The window focuses on the two quotas you check most often (`5h` and `7d`), plus extra usage, reset countdowns, and a stale-data indicator when values may be outdated
+- **Zero configuration** - defaults to your existing Claude Code login for tray alerts and commands; if Codex is logged in locally, the detail window shows Codex usage too, and usage queries do not use API keys
+- **Live tray icon** with two [configurable](docs/configuration.md#tray-icon-bars) progress bars (session + weekly by default), [configurable tooltip](docs/configuration.md#tooltip-fields), percentage display, a right-click menu to choose which provider the tray shows (Auto shows Codex and Claude in the hover tooltip while icon bars use the primary provider), and theme-aware colors for light and dark taskbars
+- **Desktop detail window** - launches visible on startup, stays open until you hide it, supports left-drag repositioning, and can be pinned above other windows. The window provides All / Codex / Claude views with both providers' `5h` / `7d` quotas, local 30-day cost and token estimates, reset countdowns, and stale-data indicators
 - **Smart alerts** - configurable threshold notifications per quota type, with time-aware mode that only alerts when usage outpaces elapsed time. Reset notifications when a nearly exhausted quota refills
 - **[Event commands](docs/event-commands.md)** - run a custom shell command when a quota resets, a usage threshold is crossed, or the app starts up. Send push notifications to your phone, resume an AI agent, start a fresh 5-hour session automatically, play an alert sound, or trigger any custom workflow
-- **Automatic token refresh** - when the OAuth session expires, runs `claude update` in the background to renew the token without user intervention. If a CLI update is installed, shows a notification
+- **Automatic token refresh** - Claude mode runs `claude update` when the OAuth session expires; Codex mode refreshes the local ChatGPT OAuth token directly
 - **Adaptive polling** - speeds up during active usage, pauses when the computer is idle or locked, aligns to imminent quota resets, and backs off on rate-limit errors
 - **13 languages** (English, German, French, Spanish, Portuguese, Italian, Japanese, Korean, Hindi, Indonesian, Chinese Simplified, Chinese Traditional, Ukrainian) - auto-detected from your Windows display language, with optional manual override via the `language` setting
 - **[Customizable](docs/configuration.md)** - optionally override polling intervals, colors, alert thresholds, and more via a JSON settings file
@@ -27,14 +27,14 @@ A native Windows tray app that shows your Claude usage at a glance - lightweight
 
 ## Security & Transparency
 
-This tool handles your Claude Code OAuth token, so you should be able to verify it is safe. The codebase is deliberately structured for easy auditing:
+This tool handles your Claude Code or Codex OAuth token, so you should be able to verify it is safe. The codebase is deliberately structured for easy auditing:
 
-- **Single network destination** - communicates exclusively with `api.anthropic.com`, no other hosts
+- **Fixed network destinations** - Claude mode communicates only with `api.anthropic.com`; Codex mode communicates only with `auth.openai.com` and `chatgpt.com`
 - **Credentials stay local** - the OAuth token is used only in HTTP Authorization headers, never logged, stored elsewhere, or transmitted to third parties
-- **Read-only** - the app never writes files to disk
+- **Minimal writes** - the app does not write its own state files; after a successful Codex OAuth refresh, it writes the refreshed token back to Codex's own `auth.json`
 - **No dynamic code execution** - no `eval()`, `exec()`, `compile()`, or dynamic imports
 - **No obfuscation** - no encoded strings, no hidden URLs, no minified logic
-- **Modular architecture** - small, focused modules with security-critical code (credentials, API calls) isolated in a single file ([`api.py`](src/integrations/api.py))
+- **Modular architecture** - small, focused modules with security-critical code (credentials, API calls) isolated in provider modules ([`api.py`](src/integrations/api.py), [`codex_api.py`](src/integrations/codex_api.py))
 - **Minimal runtime dependencies** - only four well-known packages: [requests](https://pypi.org/project/requests/), [Pillow](https://pypi.org/project/pillow/), [pystray](https://pypi.org/project/pystray/), [pywebview](https://pypi.org/project/pywebview/)
 
 ---
@@ -42,10 +42,11 @@ This tool handles your Claude Code OAuth token, so you should be able to verify 
 ## Requirements
 
 - **Windows 10 or Windows 11** (64-bit)
-- **[Claude Code](https://docs.anthropic.com/en/docs/claude-code)** installed and logged in (CLI, VS Code extension, or JetBrains plugin - any variant works). The app reads the OAuth token that Claude Code stores locally (`~/.claude/.credentials.json`). If you have `CLAUDE_CONFIG_DIR` set, the app uses that directory instead.
+- **Claude data**: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (CLI, VS Code extension, or JetBrains plugin - any variant works). The app reads the OAuth token that Claude Code stores locally (`~/.claude/.credentials.json`). If you have `CLAUDE_CONFIG_DIR` set, the app uses that directory instead.
+- **Codex data**: the app reads ChatGPT/Codex OAuth tokens from `%CODEX_HOME%\auth.json` or `~\.codex\auth.json`. `OPENAI_API_KEY` cannot query Codex usage. `usage_provider` chooses the primary provider for alerts, event commands, and Auto icon bars; `tray_provider` controls tray display separately.
 
 > [!TIP]
-> If the token expires, the app automatically runs `claude update` to refresh it. If the token is missing entirely, the app shows a notification and a "!" icon - log in to Claude Code and the monitor picks it up automatically.
+> Claude token expiry runs `claude update`; Codex tokens older than 8 days are refreshed directly through OAuth. If the token is missing entirely, the app shows a notification and a "!" icon - log in to the selected tool and the monitor picks it up automatically.
 
 ---
 
@@ -62,7 +63,8 @@ This tool handles your Claude Code OAuth token, so you should be able to verify 
 | **Hover** over the tray icon | Tooltip shows 5h and 7d usage percentages with reset times |
 | **App start** | The desktop detail window opens immediately near the tray |
 | **Left-click** the tray icon | Shows the desktop detail window and brings it to the front |
-| **Right-click** the tray icon | Context menu: show window, autostart toggle, test event commands, restart, GitHub link, or quit |
+| **All / Codex / Claude** | Switches between combined and provider-specific detail views |
+| **Right-click** the tray icon | Context menu: show window, provider display selector, autostart toggle, test event commands, restart, GitHub link, or quit |
 | **PIN** button | Keeps the desktop window always on top |
 | **X** button or **Escape** | Hides the desktop window to the tray |
 
@@ -93,6 +95,7 @@ All settings work out of the box - no configuration file is needed. To customize
 
 ```json
 {
+  "usage_provider": "claude",
   "poll_interval": 180,
   "bar_fg": "#00cc66",
   "bar_fg_warn": "#ff6600"
@@ -205,10 +208,10 @@ This project is developed with [Claude Code](https://docs.anthropic.com/en/docs/
 
 New features should follow the existing architecture. Key points from the guidelines:
 
-- Security-critical code (credentials, API calls) stays isolated in [`api.py`](src/integrations/api.py)
+- Security-critical code (credentials, API calls) stays isolated in [`api.py`](src/integrations/api.py) and provider modules
 - All user-facing changes need updates in [`CHANGELOG.md`](CHANGELOG.md), [`README.md`](README.md), and [`docs/configuration.md`](docs/configuration.md) where applicable
 - Tests are required - run `python -m unittest discover -s tests` before committing
-- The app is read-only and must never write files to disk
+- The app does not write its own state files; after a successful Codex OAuth refresh, it writes only Codex's own `auth.json`
 
 </details>
 

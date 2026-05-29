@@ -4,6 +4,7 @@ All settings work out of the box - no configuration file is needed. To customize
 
 ```json
 {
+  "usage_provider": "claude",
   "poll_interval": 180,
   "bar_fg": "#4a9eff",
   "bar_fg_mid": "#65c18c",
@@ -19,6 +20,51 @@ The app searches for this file in these locations (first match wins):
 3. **`~/.claude/usage-monitor-settings.json`**
 
 The app never creates or modifies this file. To start, create an empty file and add keys as needed. Settings are read at startup - after editing the file, use the **Restart** option in the tray context menu to apply changes.
+
+## Usage provider
+
+Choose the primary provider used by alerts, reset detection, event commands, and the tray icon bars when `tray_provider` is `"auto"`. The desktop window still attempts to show both Claude and Codex in its All view.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `usage_provider` | `"claude"` | Primary provider for alerts, reset detection, event commands, and Auto tray icon bars. Valid values: `"claude"` or `"codex"` |
+
+Claude data reads Claude Code OAuth credentials from `~/.claude/.credentials.json` (or `CLAUDE_CONFIG_DIR`). Codex data reads ChatGPT/Codex OAuth credentials from `%CODEX_HOME%\auth.json` when `CODEX_HOME` is set, otherwise `~\.codex\auth.json`.
+
+```json
+{
+    "usage_provider": "codex"
+}
+```
+
+Codex uses direct OAuth only. `OPENAI_API_KEY` cannot query ChatGPT/Codex usage and is intentionally ignored for this provider. Setting `usage_provider` to `codex` does not hide Claude from the desktop window; it only makes Codex the primary provider for alerts, reset detection, event commands, and Auto tray icon bars.
+
+## Tray provider
+
+Choose which provider appears in the tray icon and hover tooltip. This is separate from `usage_provider`, which remains the primary provider for alerts and automation.
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `tray_provider` | `"auto"` | Tray display selector. Valid values: `"auto"`, `"claude"`, or `"codex"` |
+
+In `"auto"` mode, the tray hover tooltip shows Codex and Claude in that order. The tray icon still uses the primary `usage_provider` for its two progress bars because a two-bar icon cannot clearly show both providers' session and weekly quotas at the same time.
+
+```json
+{
+    "tray_provider": "codex"
+}
+```
+
+## Local usage estimates
+
+The desktop window shows local cost and token estimates for each provider. These values are read from local JSONL logs and are never uploaded.
+
+| Provider | Local files |
+|----------|-------------|
+| Claude | `$CLAUDE_CONFIG_DIR/projects/**/*.jsonl`, `~/.config/claude/projects/**/*.jsonl`, `~/.claude/projects/**/*.jsonl`, and `~/.pi/agent/sessions/**/*.jsonl` |
+| Codex | `%CODEX_HOME%\sessions/**/*.jsonl`, `%CODEX_HOME%\archived_sessions/**/*.jsonl`, or the same paths under `~\.codex` |
+
+The estimate window is a rolling 30 days including today. Known models use a bundled static USD price table; unknown models still count tokens but do not contribute to cost. The app keeps only an in-memory file parse cache keyed by path, size, and modification time, and it does not write a persistent local-usage cache.
 
 ## Alert thresholds
 
@@ -62,7 +108,7 @@ Must be an array of non-empty strings. Duplicates are silently removed. An empty
 
 ## Popup fields
 
-The desktop window now always shows exactly two quota rows: `five_hour` and `seven_day`. The `popup_fields` setting is still accepted for backward compatibility, but it no longer changes what the window displays.
+The desktop window now always shows exactly two quota rows per provider: `five_hour` and `seven_day`. The `popup_fields` setting is still accepted for backward compatibility, but it no longer changes what the window displays.
 
 | Key | Default | Description |
 |-----|---------|-------------|

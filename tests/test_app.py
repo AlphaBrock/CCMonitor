@@ -479,7 +479,7 @@ class TestUpdateOrchestration(unittest.TestCase):
 
         self.assertEqual(self.app._last_response, {})
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_success_updates_last_response(self, _icon, _tooltip):
         """Successful update stores response in _last_response."""
@@ -491,7 +491,7 @@ class TestUpdateOrchestration(unittest.TestCase):
 
         self.assertEqual(self.app._last_response, data)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_status_image')
     def test_error_updates_last_response(self, _status, _tooltip):
         """Error update stores error response in _last_response."""
@@ -503,7 +503,7 @@ class TestUpdateOrchestration(unittest.TestCase):
 
         self.assertEqual(self.app._last_response, data)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_token_refresh_notification(self, _icon, _tooltip):
         """Shows notification when token refresh updated CLI version."""
@@ -519,7 +519,7 @@ class TestUpdateOrchestration(unittest.TestCase):
         self.assertIn('2.1.38', args[0])
         self.assertIn('2.1.69', args[0])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_notification_when_no_cli_update(self, _icon, _tooltip):
         """No notification when token refreshed but no CLI update."""
@@ -532,7 +532,7 @@ class TestUpdateOrchestration(unittest.TestCase):
 
         self.app.icon.notify.assert_not_called()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_status_image')
     def test_error_returns_before_threshold_checks(self, _status, _tooltip):
         """Error response returns early without threshold checks."""
@@ -544,7 +544,7 @@ class TestUpdateOrchestration(unittest.TestCase):
             self.app.update()
             mock_check.assert_not_called()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_update_tracks_previous_values(self, _icon, _tooltip):
         """update() stores current pct values for next comparison."""
@@ -557,7 +557,7 @@ class TestUpdateOrchestration(unittest.TestCase):
         self.assertEqual(self.app._prev_utilization.get('five_hour'), 42.0)
         self.assertEqual(self.app._prev_utilization.get('seven_day'), 15.0)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_status_image')
     def test_error_does_not_update_previous_values(self, _status, _tooltip):
         """Error response does not change tracked previous values."""
@@ -588,7 +588,7 @@ class TestResetNotifications(unittest.TestCase):
         self._cmd_patch.stop()
         _cleanup(self.app)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_5h_reset_notification(self, _icon, _tooltip):
         """Notification fires when 5h usage drops from >95% with 7d not blocking."""
@@ -601,7 +601,7 @@ class TestResetNotifications(unittest.TestCase):
 
         self.app.icon.notify.assert_called_once()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_5h_reset_suppressed_when_7d_blocking(self, _icon, _tooltip):
         """No 5h reset notification when 7d is at 99%+."""
@@ -615,7 +615,7 @@ class TestResetNotifications(unittest.TestCase):
 
         self.app.icon.notify.assert_not_called()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_7d_reset_notification(self, _icon, _tooltip):
         """Notification fires when 7d usage drops from >98% with 5h not blocking."""
@@ -628,7 +628,7 @@ class TestResetNotifications(unittest.TestCase):
 
         self.app.icon.notify.assert_called_once()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_reset_notification_on_first_update(self, _icon, _tooltip):
         """No reset notification on first update (no previous values)."""
@@ -640,7 +640,7 @@ class TestResetNotifications(unittest.TestCase):
 
         self.app.icon.notify.assert_not_called()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_update_ignores_non_dict_entries(self, _icon, _tooltip):
         """Non-dict entries in API response don't affect quota tracking."""
@@ -658,7 +658,7 @@ class TestResetNotifications(unittest.TestCase):
         self.assertEqual(self.app._prev_utilization.get('five_hour'), 55.0)
         self.assertNotIn('error_code', self.app._prev_utilization)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_update_excludes_extra_usage_from_quota_tracking(self, _icon, _tooltip):
         """extra_usage is not tracked as a quota field for resets or fast polling."""
@@ -674,7 +674,7 @@ class TestResetNotifications(unittest.TestCase):
         self.assertIn('five_hour', self.app._prev_utilization)
         self.assertNotIn('extra_usage', self.app._prev_utilization)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_update_handles_all_null_fields(self, _icon, _tooltip):
         """All-null quota fields produce empty tracking state."""
@@ -686,7 +686,7 @@ class TestResetNotifications(unittest.TestCase):
 
         self.assertEqual(self.app._prev_utilization, {})
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_7d_reset_suppressed_when_5h_blocking(self, _icon, _tooltip):
         """No 7d reset notification when 5h is at 99%+."""
@@ -701,7 +701,7 @@ class TestResetNotifications(unittest.TestCase):
         self.app.icon.notify.assert_not_called()
 
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_5h_reset_notification_deferred_while_idle(self, _icon, _tooltip, _locked):
         """Reset notification is deferred (not shown) while user is away."""
@@ -716,7 +716,7 @@ class TestResetNotifications(unittest.TestCase):
         self.assertEqual(len(self.app._deferred_notifications), 1)
 
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_deferred_notification_shown_on_flush(self, _icon, _tooltip, _locked):
         """Deferred notifications are shown when flushed."""
@@ -734,7 +734,7 @@ class TestResetNotifications(unittest.TestCase):
         self.assertEqual(len(self.app._deferred_notifications), 0)
 
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_repeated_resets_while_idle_deduplicated(self, _icon, _tooltip, _locked):
         """Multiple reset drops while idle produce only one deferred notification."""
@@ -760,7 +760,7 @@ class TestResetNotifications(unittest.TestCase):
 
     @patch('src.runtime.app.ALERT_TIME_AWARE', False)
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_threshold_notifications_deferred_and_deduplicated(self, _icon, _tooltip, _locked):
         """Successive threshold crossings while idle keep only the latest notification per variant."""
@@ -803,7 +803,7 @@ class TestFastPolling(unittest.TestCase):
         self._cmd_patch.stop()
         _cleanup(self.app)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fast_polling_starts_on_usage_increase(self, _icon, _tooltip):
         """Fast polls start when 5h usage is increasing."""
@@ -816,7 +816,7 @@ class TestFastPolling(unittest.TestCase):
 
         self.assertGreater(self.app._fast_polls_remaining, 0)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fast_polling_decrements(self, _icon, _tooltip):
         """Fast poll counter decrements when usage is stable."""
@@ -830,7 +830,7 @@ class TestFastPolling(unittest.TestCase):
 
         self.assertEqual(self.app._fast_polls_remaining, 1)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fast_polling_not_below_zero(self, _icon, _tooltip):
         """Fast poll counter does not go below zero."""
@@ -858,7 +858,7 @@ class TestRenderTray(unittest.TestCase):
     def tearDown(self):
         _cleanup(self.app)
 
-    @patch('src.runtime.app.format_tooltip', return_value='Usage: 42%')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='Usage: 42%')
     @patch('src.runtime.app.create_icon_image')
     def test_success_renders_icon(self, mock_icon, _tooltip):
         """Successful data renders usage icon."""
@@ -868,7 +868,7 @@ class TestRenderTray(unittest.TestCase):
         mock_icon.assert_called_once_with(42.0, 10.0, False, mode_top='utilization', mode_bottom='utilization', time_pct_top=None, time_pct_bottom=None, extra_usage_available=False)
         self.assertEqual(self.app.icon.title, 'Usage: 42%')
 
-    @patch('src.runtime.app.format_tooltip', return_value='Error')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='Error')
     @patch('src.runtime.app.create_status_image')
     def test_error_renders_exclamation(self, mock_status, _tooltip):
         """Error data renders '!' status icon."""
@@ -877,7 +877,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_status.assert_called_once_with('!', False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='Auth Error')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='Auth Error')
     @patch('src.runtime.app.create_status_image')
     def test_auth_error_renders_c_exclamation(self, mock_status, _tooltip):
         """Auth error data renders 'C!' status icon."""
@@ -886,7 +886,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_status.assert_called_once_with('C!', False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_missing_utilization_defaults_to_zero(self, mock_icon, _tooltip):
         """Missing utilization values default to 0."""
@@ -895,7 +895,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(0, 0, False, mode_top='utilization', mode_bottom='utilization', time_pct_top=None, time_pct_bottom=None, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.ICON_FIELDS', ['seven_day_sonnet', 'five_hour'])
     def test_custom_icon_fields(self, mock_icon, _tooltip):
@@ -908,7 +908,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(75.0, 30.0, False, mode_top='utilization', mode_bottom='utilization', time_pct_top=None, time_pct_bottom=None, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.ICON_FIELDS', ['unknown_field', 'five_hour'])
     def test_icon_fields_missing_from_response_defaults_to_zero(self, mock_icon, _tooltip):
@@ -918,7 +918,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(0, 42.0, False, mode_top='utilization', mode_bottom='utilization', time_pct_top=None, time_pct_bottom=None, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.ICON_FIELDS', ['seven_day_sonnet', 'five_hour'])
     def test_icon_fields_null_in_response_defaults_to_zero(self, mock_icon, _tooltip):
@@ -928,7 +928,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(0, 42.0, False, mode_top='utilization', mode_bottom='utilization', time_pct_top=None, time_pct_bottom=None, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.elapsed_pct', return_value=40.0)
     @patch('src.runtime.app.ICON_FIELDS', ['five_hour:overage', 'seven_day'])
@@ -942,7 +942,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(60.0, 20.0, False, mode_top='overage', mode_bottom='utilization', time_pct_top=40.0, time_pct_bottom=None, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.elapsed_pct', return_value=50.0)
     @patch('src.runtime.app.ICON_FIELDS', ['five_hour:overage', 'seven_day:overage'])
@@ -956,7 +956,7 @@ class TestRenderTray(unittest.TestCase):
 
         mock_icon.assert_called_once_with(30.0, 10.0, False, mode_top='overage', mode_bottom='overage', time_pct_top=50.0, time_pct_bottom=50.0, extra_usage_available=False)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.ICON_FIELDS', ['five_hour:overage', 'seven_day'])
     def test_overage_mode_field_parsed_as_dict_key(self, mock_icon, _tooltip):
@@ -971,7 +971,7 @@ class TestRenderTray(unittest.TestCase):
         call_args = mock_icon.call_args
         self.assertEqual(call_args[0][0], 55.0)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_available_true_when_credits_remain(self, mock_icon, _tooltip):
         """extra_usage_available is True when extra-usage is enabled and credits are not exhausted."""
@@ -984,7 +984,7 @@ class TestRenderTray(unittest.TestCase):
 
         self.assertTrue(mock_icon.call_args.kwargs['extra_usage_available'])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_available_false_when_disabled(self, mock_icon, _tooltip):
         """extra_usage_available is False when the account has not enabled extra usage."""
@@ -996,7 +996,7 @@ class TestRenderTray(unittest.TestCase):
 
         self.assertFalse(mock_icon.call_args.kwargs['extra_usage_available'])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_available_false_when_credits_exhausted(self, mock_icon, _tooltip):
         """extra_usage_available is False when all credits have been spent."""
@@ -1008,7 +1008,7 @@ class TestRenderTray(unittest.TestCase):
 
         self.assertFalse(mock_icon.call_args.kwargs['extra_usage_available'])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_available_false_when_no_extra_usage_key(self, mock_icon, _tooltip):
         """extra_usage_available is False when the API response omits the extra_usage object entirely."""
@@ -1017,7 +1017,7 @@ class TestRenderTray(unittest.TestCase):
 
         self.assertFalse(mock_icon.call_args.kwargs['extra_usage_available'])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_available_false_when_extra_usage_null(self, mock_icon, _tooltip):
         """extra_usage_available is False when the extra_usage field is explicitly null."""
@@ -1040,7 +1040,7 @@ class TestOnThemeChanged(unittest.TestCase):
     def tearDown(self):
         _cleanup(self.app)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     @patch('src.runtime.app.taskbar_uses_light_theme', return_value=True)
     def test_theme_change_re_renders(self, _theme, mock_icon, _tooltip):
@@ -1424,7 +1424,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_reset_command_fires_on_5h_drop(self, _icon, _tooltip, mock_cmd):
         """Reset command fires when 5h usage drops."""
@@ -1448,7 +1448,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_reset_command_fires_on_7d_drop(self, _icon, _tooltip, mock_cmd):
         """Reset command fires when 7d usage drops."""
@@ -1468,7 +1468,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_reset_command_fires_on_any_drop_not_just_exhausted(self, _icon, _tooltip, mock_cmd):
         """Reset command fires on any usage drop, not just from near-exhaustion."""
@@ -1486,7 +1486,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_reset_command_missing_resets_at(self, _icon, _tooltip, mock_cmd):
         """USAGE_MONITOR_RESETS_AT is empty string when resets_at is absent from data."""
@@ -1503,7 +1503,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', [])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_command_when_setting_empty(self, _icon, _tooltip, mock_cmd):
         """No command executed when on_reset_command is empty."""
@@ -1518,7 +1518,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_command_when_usage_increases(self, _icon, _tooltip, mock_cmd):
         """No command when usage is increasing."""
@@ -1533,7 +1533,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_both_quotas_drop_fires_two_commands(self, _icon, _tooltip, mock_cmd):
         """Two commands fire when both 5h and 7d usage drop simultaneously."""
@@ -1550,7 +1550,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_command_on_first_update(self, _icon, _tooltip, mock_cmd):
         """No reset command on first update (no previous values)."""
@@ -1564,7 +1564,7 @@ class TestResetCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_command_when_usage_stable(self, _icon, _tooltip, mock_cmd):
         """No command when usage stays the same."""
@@ -1580,7 +1580,7 @@ class TestResetCommand(unittest.TestCase):
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_reset_command_fires_while_notification_deferred(self, _icon, _tooltip, _locked, mock_cmd):
         """Reset command fires immediately even when notification is deferred due to idle/lock."""
@@ -1695,7 +1695,7 @@ class TestThresholdCommand(unittest.TestCase):
     @patch('src.runtime.app.ALERT_TIME_AWARE', False)
     @patch('src.runtime.app.run_event_command')
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_threshold_command_fires_while_notification_deferred(self, _icon, _tooltip, _locked, mock_cmd):
         """Threshold command fires immediately even when notification is deferred due to idle/lock."""
@@ -2103,7 +2103,7 @@ class TestIdleResetPendingCleared(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_5h_drop_clears_idle_reset_pending(self, _icon, _tooltip, _cmd):
         """_idle_reset_pending is cleared when a 5h usage drop is detected."""
@@ -2119,7 +2119,7 @@ class TestIdleResetPendingCleared(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_7d_drop_clears_idle_reset_pending(self, _icon, _tooltip, _cmd):
         """_idle_reset_pending is cleared when a 7d usage drop is detected."""
@@ -2135,7 +2135,7 @@ class TestIdleResetPendingCleared(unittest.TestCase):
 
     @patch('src.runtime.app.ON_RESET_COMMAND', ['echo reset'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_drop_keeps_idle_reset_pending(self, _icon, _tooltip, _cmd):
         """_idle_reset_pending persists when usage stays stable (no drop)."""
@@ -2149,7 +2149,7 @@ class TestIdleResetPendingCleared(unittest.TestCase):
 
         self.assertTrue(self.app._idle_reset_pending)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_error_response_keeps_idle_reset_pending(self, _icon, _tooltip):
         """_idle_reset_pending persists on API error (network failure)."""
@@ -2187,7 +2187,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         mock.profile = {'account': {'uuid': uuid, 'email': email}}
         return mock
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_shows_notification(self, _icon, _tooltip):
         """Notification fires when account UUID changes between updates."""
@@ -2201,7 +2201,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         args = self.app.icon.notify.call_args[0]
         self.assertIn('new@example.com', args[0])
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_notification_on_first_update(self, _icon, _tooltip):
         """No account switch notification on first update (_prev_account_uuid is None)."""
@@ -2212,7 +2212,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
 
         self.app.icon.notify.assert_not_called()
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_clears_prev_utilization(self, _icon, _tooltip):
         """Account switch resets _prev_utilization to prevent false reset notifications."""
@@ -2226,7 +2226,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         # prev_utilization must be cleared so reset detection cannot fire on next cycle
         self.assertEqual(self.app._prev_utilization, {})
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_clears_notified_thresholds(self, _icon, _tooltip):
         """Account switch resets _notified_thresholds so threshold alerts re-arm for new account."""
@@ -2239,7 +2239,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
 
         self.assertEqual(self.app._notified_thresholds, {})
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_no_reset_notification(self, _icon, _tooltip):
         """No quota reset notification fires when account switches (even if utilization dropped from high)."""
@@ -2256,7 +2256,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         title_arg = self.app.icon.notify.call_args[0][1]
         self.assertNotIn('Reset', title_arg)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_same_account_no_notification(self, _icon, _tooltip):
         """No account switch notification when UUID is unchanged."""
@@ -2270,7 +2270,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         self.app.icon.notify.assert_not_called()
 
     @patch('src.runtime.app.is_workstation_locked', return_value=True)
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_notification_deferred_while_idle(self, _icon, _tooltip, _locked):
         """Account switch notification is deferred when user is away."""
@@ -2283,7 +2283,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
         self.app.icon.notify.assert_not_called()
         self.assertIn('account_switched', self.app._deferred_notifications)
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_account_switch_updates_prev_account_uuid(self, _icon, _tooltip):
         """After account switch, _prev_account_uuid is updated to the new UUID."""
@@ -2295,7 +2295,7 @@ class TestAccountSwitchDetection(unittest.TestCase):
 
         self.assertEqual(self.app._prev_account_uuid, 'uuid-new')
 
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_notification_when_profile_unavailable(self, _icon, _tooltip):
         """No account switch notification when profile could not be loaded (UUID unknown)."""
@@ -2329,7 +2329,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fires_on_first_successful_update(self, _icon, _tooltip, mock_cmd):
         """Startup command fires once on the first successful update."""
@@ -2352,7 +2352,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fires_only_once_across_multiple_updates(self, _icon, _tooltip, mock_cmd):
         """Startup command does not fire again on subsequent updates."""
@@ -2367,7 +2367,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', [])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_fire_when_command_unset(self, _icon, _tooltip, mock_cmd):
         """Startup command is not invoked when ON_STARTUP_COMMAND is empty."""
@@ -2380,7 +2380,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_fire_on_error_response(self, _icon, _tooltip, mock_cmd):
         """Startup command is skipped when the first update returns an error."""
@@ -2393,7 +2393,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_fires_after_initial_error_then_success(self, _icon, _tooltip, mock_cmd):
         """Startup command fires on the first SUCCESSFUL update, even after errors."""
@@ -2412,7 +2412,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_extra_usage_env_vars_when_enabled(self, _icon, _tooltip, mock_cmd):
         """Extra usage env vars are emitted when extra_usage is enabled."""
@@ -2431,7 +2431,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_no_extra_usage_env_vars_when_disabled(self, _icon, _tooltip, mock_cmd):
         """Extra usage env vars are not emitted when extra_usage is disabled."""
@@ -2449,7 +2449,7 @@ class TestStartupCommand(unittest.TestCase):
 
     @patch('src.runtime.app.ON_STARTUP_COMMAND', ['echo startup'])
     @patch('src.runtime.app.run_event_command')
-    @patch('src.runtime.app.format_tooltip', return_value='tooltip')
+    @patch('src.runtime.app.format_dashboard_tooltip', return_value='tooltip')
     @patch('src.runtime.app.create_icon_image')
     def test_handles_null_quota_field(self, _icon, _tooltip, mock_cmd):
         """Quota fields with value None (feature not enabled) are skipped without error."""

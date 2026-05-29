@@ -8,9 +8,9 @@ snapshot consistency, and state management.
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from src.runtime.cache import CacheSnapshot, UpdateResult, UsageCache
+from src.runtime.cache import CacheSnapshot, DashboardCache, ProviderClient, UpdateResult, UsageCache
 from src.integrations.claude_cli import RefreshResult
 
 _SUCCESS_DATA = {'five_hour': {'utilization': 42.0}}
@@ -22,6 +22,17 @@ _SERVER_MSG_DATA = {'error': 'HTTP 429', 'server_message': 'Rate limited.'}
 def _make_cache() -> UsageCache:
     """Create a fresh UsageCache instance."""
     return UsageCache()
+
+
+def _client(provider_id: str, *, usage: dict) -> ProviderClient:
+    """Create a deterministic provider client for cache tests."""
+    return ProviderClient(
+        provider_id=provider_id,
+        fetch_usage=lambda: usage,
+        fetch_profile=lambda: None,
+        read_access_token=lambda: f'{provider_id}-token',
+        refresh_auth_token=lambda: RefreshResult(success=True, updated=False, old_version='', new_version='', error=''),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -74,7 +85,7 @@ class TestLockBehavior(unittest.TestCase):
     def test_refreshing_reset_on_refresh_exception(self, _mock_token, _mock_fetch):
         """refreshing is False when _try_token_refresh raises an exception."""
         cache = _make_cache()
-        with patch('src.runtime.cache.refresh_token', side_effect=RuntimeError('cli crash')):
+        with patch('src.runtime.cache.refresh_auth_token', side_effect=RuntimeError('cli crash')):
             with self.assertRaises(RuntimeError):
                 cache.update()
 
@@ -189,6 +200,21 @@ class TestSuccessState(unittest.TestCase):
         cache._last_failed_token = 'stale-token'
         cache.update()
         self.assertIsNone(cache._last_failed_token)
+
+    @patch('src.runtime.cache.read_access_token', return_value='codex-token')
+    @patch('src.runtime.cache.fetch_usage')
+    def test_success_extracts_internal_profile(self, mock_fetch, _mock_token):
+        """Internal provider profile metadata is not stored as usage data."""
+        profile = {'account': {}, 'organization': {'organization_type': 'pro'}}
+        mock_fetch.return_value = {'five_hour': {'utilization': 12.0}, '__profile': profile}
+        cache = _make_cache()
+
+        result = cache.update()
+
+        self.assertEqual(result.data, {'five_hour': {'utilization': 12.0}})
+        self.assertEqual(cache.usage, {'five_hour': {'utilization': 12.0}})
+        self.assertEqual(cache.profile, profile)
+        self.assertEqual(cache._profile_token, 'codex-token')
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +335,7 @@ class TestFailedTokenGuard(unittest.TestCase):
 
     @patch('src.runtime.cache.read_access_token', return_value='token-123')
     @patch('src.runtime.cache.fetch_usage', return_value=_AUTH_ERROR_DATA)
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_auth_error_sets_failed_token_when_no_refresh(self, mock_refresh, _mock_fetch, _mock_token):
         """Auth error without successful refresh sets failed token guard."""
         mock_refresh.return_value = RefreshResult(success=False, updated=False, old_version='', new_version='', error='CLI not found')
@@ -485,7 +511,7 @@ class TestRateLimitRemaining(unittest.TestCase):
 class TestTokenRefresh(unittest.TestCase):
     """Tests for _try_token_refresh() automatic token renewal."""
 
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_failure_returns_none(self, mock_refresh):
         """When refresh_token() fails, returns None."""
         mock_refresh.return_value = RefreshResult(success=False, updated=False, old_version='', new_version='', error='CLI not found')
@@ -494,7 +520,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage', return_value=_SUCCESS_DATA)
     @patch('src.runtime.cache.read_access_token', return_value='new-token')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_success_with_new_token_retries(self, mock_refresh, _mock_token, _mock_fetch):
         """When token changes after refresh, retries API and returns RefreshResult on success."""
         mock_refresh.return_value = RefreshResult(success=True, updated=False, old_version='2.1.69', new_version='2.1.69', error='')
@@ -509,7 +535,7 @@ class TestTokenRefresh(unittest.TestCase):
         self.assertEqual(cache.consecutive_errors, 0)
 
     @patch('src.runtime.cache.read_access_token', return_value='same-token')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_success_but_token_unchanged(self, mock_refresh, _mock_token):
         """When token doesn't change after refresh, returns None without retry."""
         mock_refresh.return_value = RefreshResult(success=True, updated=False, old_version='2.1.69', new_version='2.1.69', error='')
@@ -519,7 +545,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage', return_value=_SUCCESS_DATA)
     @patch('src.runtime.cache.read_access_token', return_value='same-token')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_token_unchanged_skips_retry_fetch(self, mock_refresh, _mock_token, mock_fetch):
         """When token doesn't change after refresh, no retry fetch_usage() call is made."""
         mock_refresh.return_value = RefreshResult(success=True, updated=False, old_version='2.1.69', new_version='2.1.69', error='')
@@ -531,7 +557,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage', return_value=_AUTH_ERROR_DATA)
     @patch('src.runtime.cache.read_access_token', return_value='new-token')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_success_but_retry_fails(self, mock_refresh, _mock_token, _mock_fetch):
         """When token changes but retry still fails, returns RefreshResult and records error."""
         mock_refresh.return_value = RefreshResult(success=True, updated=False, old_version='2.1.69', new_version='2.1.69', error='')
@@ -546,7 +572,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage')
     @patch('src.runtime.cache.read_access_token', return_value='token-123')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_auth_error_triggers_refresh_via_update(self, mock_refresh, _mock_token, mock_fetch):
         """update() calls _try_token_refresh on 401 auth error."""
         mock_refresh.return_value = RefreshResult(success=False, updated=False, old_version='', new_version='', error='')
@@ -556,6 +582,19 @@ class TestTokenRefresh(unittest.TestCase):
         with patch.object(cache, '_try_token_refresh', wraps=cache._try_token_refresh) as spy:
             cache.update()
             spy.assert_called_once_with('token-123')
+
+    @patch('src.runtime.cache.refresh_auth_token')
+    @patch('src.runtime.cache.fetch_usage', return_value={'error': 'expired', 'auth_error': True, 'refresh_attempted': True})
+    @patch('src.runtime.cache.read_access_token', return_value='token-123')
+    def test_provider_refresh_attempted_skips_second_refresh(self, _mock_token, _mock_fetch, mock_refresh):
+        """Provider-side refresh failures are not retried again by the cache."""
+        cache = _make_cache()
+
+        result = cache.update()
+
+        self.assertIsNone(result.token_refresh)
+        self.assertEqual(cache._last_failed_token, 'token-123')
+        mock_refresh.assert_not_called()
 
     @patch('src.runtime.cache.fetch_usage', return_value=_ERROR_DATA)
     def test_non_auth_error_skips_refresh(self, _mock_fetch):
@@ -568,7 +607,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage')
     @patch('src.runtime.cache.read_access_token', side_effect=['old-token', 'new-token'])
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_successful_refresh_clears_error(self, mock_refresh, _mock_token, mock_fetch):
         """Auth error + successful token refresh + successful retry clears error state.
 
@@ -589,7 +628,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage')
     @patch('src.runtime.cache.read_access_token', side_effect=['old-token', 'new-token'])
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_success_retry_fail_returns_error_data(self, mock_refresh, _mock_token, mock_fetch):
         """Auth error + successful refresh + failed retry returns original error data.
 
@@ -609,7 +648,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage')
     @patch('src.runtime.cache.read_access_token', side_effect=['old-token', 'new-token'])
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_refresh_retry_fail_does_not_block_new_token(self, mock_refresh, _mock_token, mock_fetch):
         """Auth error + successful refresh + failed retry does NOT set _last_failed_token.
 
@@ -626,7 +665,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage')
     @patch('src.runtime.cache.read_access_token', side_effect=['old-token', 'new-token'])
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_auth_retry_fail_increments_errors_once(self, mock_refresh, _mock_token, mock_fetch):
         """Auth error + successful refresh + failed retry increments _consecutive_errors only once."""
         mock_refresh.return_value = RefreshResult(success=True, updated=False, old_version='2.1.69', new_version='2.1.69', error='')
@@ -639,7 +678,7 @@ class TestTokenRefresh(unittest.TestCase):
 
     @patch('src.runtime.cache.fetch_usage', return_value=_AUTH_ERROR_DATA)
     @patch('src.runtime.cache.read_access_token', return_value='token-123')
-    @patch('src.runtime.cache.refresh_token')
+    @patch('src.runtime.cache.refresh_auth_token')
     def test_failed_refresh_returns_none_token_refresh(self, mock_refresh, _mock_token, _mock_fetch):
         """When refresh CLI is not available, token_refresh is None in result."""
         mock_refresh.return_value = RefreshResult(success=False, updated=False, old_version='', new_version='', error='not found')
@@ -744,6 +783,62 @@ class TestUpdateResult(unittest.TestCase):
         self.assertEqual(result.data, _SUCCESS_DATA)
         assert result.token_refresh is not None
         self.assertTrue(result.token_refresh.updated)
+
+
+# ---------------------------------------------------------------------------
+# DashboardCache
+# ---------------------------------------------------------------------------
+
+class TestDashboardCache(unittest.TestCase):
+    """Tests for the multi-provider dashboard cache."""
+
+    @patch('src.runtime.cache.read_access_token_for_provider', side_effect=lambda provider: f'{provider}-token')
+    @patch('src.runtime.cache.fetch_usage_for_provider')
+    def test_updates_both_providers_and_keeps_primary_result(self, mock_fetch, _mock_token):
+        def fetch(provider):
+            if provider == 'codex':
+                return {'seven_day': {'utilization': 34.0}}
+            return {'five_hour': {'utilization': 12.0}}
+
+        mock_fetch.side_effect = fetch
+        cache = DashboardCache(primary_provider='claude')
+
+        result = cache.update_all()
+
+        self.assertEqual(result.primary.data, {'five_hour': {'utilization': 12.0}})
+        self.assertEqual(cache.caches['codex'].usage, {'seven_day': {'utilization': 34.0}})
+        self.assertEqual(cache.caches['claude'].usage, {'five_hour': {'utilization': 12.0}})
+
+    @patch('src.runtime.cache.read_access_token_for_provider', side_effect=lambda provider: f'{provider}-token')
+    @patch('src.runtime.cache.fetch_usage_for_provider')
+    def test_one_provider_error_does_not_clear_other_provider(self, mock_fetch, _mock_token):
+        def fetch(provider):
+            if provider == 'codex':
+                return {'error': 'codex offline'}
+            return {'five_hour': {'utilization': 12.0}}
+
+        mock_fetch.side_effect = fetch
+        cache = DashboardCache(primary_provider='claude')
+
+        cache.update_all()
+
+        self.assertEqual(cache.caches['claude'].usage, {'five_hour': {'utilization': 12.0}})
+        self.assertEqual(cache.caches['codex'].last_error, 'codex offline')
+
+    def test_provider_refresh_attempted_does_not_call_client_refresh(self):
+        refresh = MagicMock()
+        client = ProviderClient(
+            provider_id='codex',
+            fetch_usage=lambda: {'error': 'expired', 'auth_error': True, 'refresh_attempted': True},
+            fetch_profile=lambda: None,
+            read_access_token=lambda: 'codex-token',
+            refresh_auth_token=refresh,
+        )
+        cache = UsageCache(client)
+
+        cache.update()
+
+        refresh.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
