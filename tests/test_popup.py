@@ -411,6 +411,34 @@ class TestPopupStaticAssets(unittest.TestCase):
         old_exe_name = "name='" + 'Usage' + 'Monitor' + 'For' + "Claude'"
         self.assertNotIn(old_exe_name, spec)
 
+    def test_release_dependencies_are_pinned_without_removed_tray_libraries(self):
+        requirements = (ROOT / 'requirements.txt').read_text(encoding='utf-8')
+        package_lines = [line.strip() for line in requirements.splitlines() if line.strip() and not line.startswith('#')]
+
+        self.assertTrue(package_lines)
+        for line in package_lines:
+            self.assertIn('==', line)
+        self.assertIn('pywebview==6.2.1', package_lines)
+        self.assertIn('pyinstaller==6.20.0', package_lines)
+        self.assertNotIn('Pillow', requirements)
+        self.assertNotIn('pystray', requirements)
+
+    def test_release_workflow_uses_pinned_python_and_requirements(self):
+        workflow = (ROOT / '.github' / 'workflows' / 'release.yml').read_text(encoding='utf-8')
+
+        self.assertIn("python-version: '3.13.0'", workflow)
+        self.assertIn("architecture: 'x64'", workflow)
+        self.assertIn('python -m pip install -r requirements.txt', workflow)
+        self.assertNotIn('pip install -r requirements.txt pyinstaller', workflow)
+
+    def test_build_script_reports_archive_entries_and_enforces_size_limit(self):
+        build_script = (ROOT / 'scripts' / 'build.py').read_text(encoding='utf-8')
+
+        self.assertIn('MAX_EXE_SIZE_MIB = 10.5', build_script)
+        self.assertIn('print_archive_summary(exe)', build_script)
+        self.assertIn('enforce_size_limit(size_mb)', build_script)
+        self.assertIn('Largest archive entries', build_script)
+
 
 class TestUsagePopupWindow(unittest.TestCase):
     def setUp(self):

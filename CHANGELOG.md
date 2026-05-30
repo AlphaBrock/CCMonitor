@@ -6,6 +6,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.3] - 2026-05-30
+
+### Changed
+
+- Release builds now pin Python architecture and dependency versions, fail if the EXE grows above 10.5 MiB, and print the largest packaged files for size audits.
+
+---
+
+### 变更
+
+- Release 打包现在固定 Python 架构和依赖版本，EXE 超过 10.5 MiB 时会失败，并在构建日志中输出最大打包文件以便审计体积。
+
 ## [1.16.2] - 2026-05-30
 
 ### Changed

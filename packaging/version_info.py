@@ -17,11 +17,11 @@ VSVersionInfo(
                 [
                     StringStruct('CompanyName', 'John Wick'),
                     StringStruct('FileDescription', 'CCMonitor'),
-                    StringStruct('FileVersion', '1.16.2'),
+                    StringStruct('FileVersion', '1.16.3'),
                     StringStruct('InternalName', 'CCMonitor'),
                     StringStruct('OriginalFilename', 'CCMonitor.exe'),
                     StringStruct('ProductName', 'CCMonitor'),
-                    StringStruct('ProductVersion', '1.16.2'),
+                    StringStruct('ProductVersion', '1.16.3'),
                 ],
             ),
         ]),
