@@ -1,18 +1,18 @@
-# Usage Monitor for Claude
+# CCMonitor
 
 **English** | [简体中文](README.md)
 
 [![Feature Ideas](https://img.shields.io/badge/Feature_Ideas-Vote_%26_Discuss-blue?style=for-the-badge&logo=github)](https://github.com/AlphaBrock/CCMonitor/discussions/categories/ideas)
 
-**Monitor your Claude rate limits in real time - right from your Windows system tray.**
+**Monitor Claude and Codex usage in real time - right from your Windows tray and desktop panel.**
 
-A native Windows tray app that shows your Claude usage at a glance - lightweight, portable, and fully auditable. Rate limits are shared across claude.ai, Claude Code, Claude Code Cowork, and IDE extensions for VS Code and JetBrains - always know how much of your session and weekly limits you have left.
+CCMonitor is a native Windows tray app that shows Claude and Codex usage at a glance - lightweight, portable, and fully auditable. Claude rate limits are shared across claude.ai, Claude Code, Claude Code Cowork, and IDE extensions for VS Code and JetBrains; Codex usage is read from the local ChatGPT/Codex OAuth session. The tray icon, desktop panel, alerts, and event commands help you track session and weekly quota before you run out.
 
 ![Desktop detail window showing account info and usage bars](assets/screenshot_EN.png)
 
 ## Features
 
-- **Portable** - single EXE (~12.5 MB), no installation, no Electron, no runtime required. Download, place anywhere, run. To uninstall, delete the file
+- **Portable** - single EXE (~9.8 MB), no installation, no Electron, no extra runtime required. Download, place anywhere, run. To uninstall, delete the file
 - **Zero configuration** - defaults to your existing Claude Code login for tray alerts and commands; if Codex is logged in locally, the detail window shows Codex usage too, and usage queries do not use API keys
 - **Live tray icon** with two [configurable](docs/configuration.md#tray-icon-bars) progress bars (session + weekly by default), [configurable tooltip](docs/configuration.md#tooltip-fields), percentage display, a right-click menu to choose which provider the tray shows (Auto shows Codex and Claude in the hover tooltip while icon bars use the primary provider), and theme-aware colors for light and dark taskbars
 - **Desktop detail window** - launches visible on startup, stays open until you hide it, supports left-drag repositioning, and can be pinned above other windows. The window provides All / Codex / Claude views with both providers' `5h` / `7d` quotas, local 30-day cost and token estimates, reset countdowns, and stale-data indicators
@@ -35,7 +35,7 @@ This tool handles your Claude Code or Codex OAuth token, so you should be able t
 - **No dynamic code execution** - no `eval()`, `exec()`, `compile()`, or dynamic imports
 - **No obfuscation** - no encoded strings, no hidden URLs, no minified logic
 - **Modular architecture** - small, focused modules with security-critical code (credentials, API calls) isolated in provider modules ([`api.py`](src/integrations/api.py), [`codex_api.py`](src/integrations/codex_api.py))
-- **Minimal runtime dependencies** - only four well-known packages: [requests](https://pypi.org/project/requests/), [Pillow](https://pypi.org/project/pillow/), [pystray](https://pypi.org/project/pystray/), [pywebview](https://pypi.org/project/pywebview/)
+- **Minimal runtime dependencies** - only a few well-known dependencies: [requests](https://pypi.org/project/requests/) for network calls and [pywebview](https://pypi.org/project/pywebview/) for the desktop panel; tray icons and notifications use native Windows APIs without Pillow or pystray
 
 ---
 
@@ -52,7 +52,7 @@ This tool handles your Claude Code or Codex OAuth token, so you should be able t
 
 ## Quick Start
 
-**No Python required.** Download the latest [**UsageMonitorForClaude.exe**](https://github.com/AlphaBrock/CCMonitor/releases/latest), place it wherever you like, and run it. To remove, disable "Start with Windows" in the context menu first (if enabled), then delete the file.
+**No Python required.** Download the latest [**CCMonitor.exe**](https://github.com/AlphaBrock/CCMonitor/releases/latest), place it wherever you like, and run it. To remove, disable "Start with Windows" in the context menu first (if enabled), then delete the file.
 
 ---
 
@@ -74,7 +74,7 @@ Windows may hide new tray icons by default. To keep the icon always visible:
 
 1. Right-click the **taskbar** → **Taskbar settings**
 2. Expand **Other system tray icons** (Win 11) or **Select which icons appear on the taskbar** (Win 10)
-3. Toggle **UsageMonitorForClaude** to **On**
+3. Toggle **CCMonitor** to **On**
 
 ### Reading the progress bars
 
@@ -124,8 +124,8 @@ The app never creates or modifies this file. See [Configuration](docs/configurat
 ### Setup
 
 ```bash
-git clone https://github.com/jens-duttke/usage-monitor-for-claude.git
-cd usage-monitor-for-claude
+git clone https://github.com/AlphaBrock/CCMonitor.git
+cd CCMonitor
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -149,7 +149,7 @@ python -m src
 python scripts/build.py
 ```
 
-Produces `dist/UsageMonitorForClaude.exe` (~12.5 MB), a single-file executable that bundles Python and all dependencies.
+Produces `dist/CCMonitor.exe` (~9.8 MB), a single-file executable that bundles Python and all dependencies.
 
 ### Desktop Window UI Development
 
@@ -170,7 +170,7 @@ This starts a local server and opens the dev preview in your default browser. Us
 5. Run the test suite: `python -m unittest discover -s tests`
 6. Smoke test: `python -m src` - verify tray icon, desktop window, and settings
 7. Build the EXE with `python scripts/build.py`
-8. Smoke test: `dist\UsageMonitorForClaude.exe` - verify tray icon, desktop window, and settings
+8. Smoke test: `dist\CCMonitor.exe` - verify tray icon, desktop window, and settings
 9. Stage the changes from steps 2 to 4
 10. Commit and push the release prep.
 11. Create and push a plain semantic tag (`X.Y.Z`) to trigger the release workflow:
@@ -190,17 +190,17 @@ The GitHub Actions workflow in [`.github/workflows/release.yml`](.github/workflo
 
 ## Contributing
 
-Contributions are welcome - whether it's bug reports, feature ideas, or pull requests. [Open an issue](https://github.com/jens-duttke/usage-monitor-for-claude/issues) to report bugs or ask questions. For feature ideas, browse and vote on existing proposals or submit your own in [Ideas](https://github.com/jens-duttke/usage-monitor-for-claude/discussions/categories/ideas).
+Contributions are welcome - whether it's bug reports, feature ideas, or pull requests. [Open an issue](https://github.com/AlphaBrock/CCMonitor/issues) to report bugs or ask questions. For feature ideas, browse and vote on existing proposals or submit your own in [Ideas](https://github.com/AlphaBrock/CCMonitor/discussions/categories/ideas).
 
 <details>
 <summary>For developers who want to contribute to the project</summary>
 
-This project is developed with [Claude Code](https://docs.anthropic.com/en/docs/claude-code). The [`.claude/CLAUDE.md`](.claude/CLAUDE.md) file contains all project conventions, coding standards, and architectural guidelines - Claude Code applies these automatically during development.
+This project is built for local Claude Code and Codex usage monitoring. The [`.claude/CLAUDE.md`](.claude/CLAUDE.md) file contains the project conventions, coding standards, and architectural guidelines.
 
 ### Workflow
 
 1. Read `.claude/CLAUDE.md` to understand the project conventions
-2. Implement your changes with Claude Code - it will follow the guidelines automatically
+2. Implement changes within the existing module boundaries so credential, API, tray, and UI logic remain auditable
 3. Before committing, run the `/review` slash command to perform a systematic quality review of all staged changes (code, tests, documentation)
 4. Stage remaining fixes if any, then run `/commit-message` to generate a properly formatted commit message
 
@@ -225,4 +225,4 @@ MIT
 
 ## Disclaimer
 
-This is an independent, community-built project. It is **not** created, endorsed, or officially supported by [Anthropic](https://www.anthropic.com/). "Claude" and "Anthropic" are trademarks of Anthropic, PBC. Use of these names is solely for descriptive purposes to indicate compatibility.
+This is an independent, community-built project. It is **not** created, endorsed, or officially supported by [Anthropic](https://www.anthropic.com/) or [OpenAI](https://openai.com/). "Claude" and "Anthropic" are trademarks of Anthropic, PBC; "OpenAI", "ChatGPT", and "Codex" are trademarks of OpenAI. Use of these names is solely for descriptive purposes to indicate compatibility.

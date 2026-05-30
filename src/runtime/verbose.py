@@ -173,7 +173,7 @@ def print_startup_diagnostics() -> None:
     """Print system and environment diagnostics before webview starts."""
     from src import __version__
 
-    print(f'\n  Usage Monitor for Claude v{__version__} - Verbose Mode')
+    print(f'\n  CCMonitor v{__version__} - Verbose Mode')
     print(f'  {"=" * 48}')
 
     # System
@@ -217,7 +217,7 @@ def print_startup_diagnostics() -> None:
 
     # Dependencies
     _section('Dependencies')
-    for pkg in ('pywebview', 'pythonnet', 'clr-loader', 'pystray', 'Pillow', 'requests'):
+    for pkg in ('pywebview', 'pythonnet', 'clr-loader', 'requests'):
         _row(pkg, _package_version(pkg))
 
     # Credentials

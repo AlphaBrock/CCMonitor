@@ -26,7 +26,7 @@ from src.presentation.settings import (
 )
 
 if TYPE_CHECKING:
-    from src.runtime.app import UsageMonitorForClaude
+    from src.runtime.app import CCMonitor
     from src.runtime.cache import CacheSnapshot, DashboardSnapshot
 
 
@@ -37,7 +37,6 @@ _CHECK_MS = 1000
 _VISIBLE_USAGE_FIELDS = ('five_hour', 'seven_day')
 _PROVIDER_ORDER = ('codex', 'claude')
 _PROVIDER_TITLES = {'codex': 'Codex', 'claude': 'Claude'}
-_PROVIDER_ICONS = {'codex': '◌', 'claude': '✺'}
 _GWL_EXSTYLE = -20
 _WS_EX_APPWINDOW = 0x00040000
 _WS_EX_TOOLWINDOW = 0x00000080
@@ -215,7 +214,7 @@ def _provider_to_dict(provider_id: str, snap: CacheSnapshot, next_poll_time: flo
     return {
         'id': provider_id,
         'title': _PROVIDER_TITLES.get(provider_id, provider_id.title()),
-        'icon': _PROVIDER_ICONS.get(provider_id, '•'),
+        'icon': '',
         'profile': profile,
         'usage': usage_rows,
         'extra': extra,
@@ -324,7 +323,7 @@ class UsagePopup:
 
     WIDTH = 380
 
-    def __init__(self, app: UsageMonitorForClaude) -> None:
+    def __init__(self, app: CCMonitor) -> None:
         self.app = app
         self._running = True
         self._pinned = False
@@ -421,6 +420,7 @@ class UsagePopup:
         """Inject init data after page load and start the incremental update loop."""
         config = init_config(self._current_snapshot(), pinned=self._pinned, next_poll_time=self.app._next_poll_time)
         self._window.evaluate_js(f'init({json.dumps(config)})')
+        self._refresh_tray_from_cache_snapshot()
 
         self._popup_hwnd = self._window.native.Handle.ToInt32()
         self._prepare_native_window()
@@ -471,6 +471,7 @@ class UsagePopup:
                 self._last_next_poll_time = next_poll_time
                 payload = snapshot_to_dict(snap, next_poll_time=next_poll_time)
                 self._window.evaluate_js(f'updateData({json.dumps(payload)})')
+                self._refresh_tray_from_cache_snapshot()
             except Exception:
                 self._running = False
 
@@ -480,6 +481,12 @@ class UsagePopup:
         if dashboard_cache is not None:
             return dashboard_cache.snapshot
         return self.app.cache.snapshot
+
+    def _refresh_tray_from_cache_snapshot(self) -> None:
+        """让托盘复用已经展示到窗口里的 cache 数据。"""
+        refresh_tray = getattr(self.app, 'refresh_tray_from_cache_snapshot', None)
+        if refresh_tray is not None:
+            refresh_tray()
 
     def _bring_to_front(self) -> None:
         """Bring the window to the foreground while preserving the current pin state."""

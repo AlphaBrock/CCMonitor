@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Tampilkan penggunaan Claude",
     "tooltip_title": "Penggunaan Claude",
@@ -68,7 +68,7 @@
     "status_updated_s": "Diperbarui {s}d yang lalu",
     "status_next_update": "Pembaruan berikutnya dalam {duration}",
     "status_refreshing": "Memperbarui...",
-    "already_running": "Usage Monitor for Claude v{running_version} sudah berjalan.\n\nApakah Anda ingin mengganti instans yang sedang berjalan?",
+    "already_running": "CCMonitor v{running_version} sudah berjalan.\n\nApakah Anda ingin mengganti instans yang sedang berjalan?",
     "pin_on": "Disematkan",
     "pin_off": "Tidak disematkan",
     "menu_language": "Bahasa",

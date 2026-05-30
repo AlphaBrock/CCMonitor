@@ -1,18 +1,18 @@
-# Usage Monitor for Claude
+# CCMonitor
 
-**简体中文**|[English](README.md) 
+**简体中文** | [English](README_en-US.md) 
 
 [![Feature Ideas](https://img.shields.io/badge/Feature_Ideas-Vote_%26_Discuss-blue?style=for-the-badge&logo=github)](https://github.com/AlphaBrock/CCMonitor/discussions/categories/ideas)
 
-**实时监控 Claude 速率限制 - 直接在 Windows 系统托盘中查看。**
+**实时监控 Claude 与 Codex 用量 - 直接在 Windows 系统托盘和桌面面板中查看。**
 
-一款原生 Windows 托盘应用，让您一目了然地掌握 Claude 用量 - 轻量、免安装、代码完全可审计。速率限制在 claude.ai、Claude Code、Claude Code Cowork 以及 VS Code 和 JetBrains IDE 扩展之间共享 - 随时了解会话和周限额剩余量。
+CCMonitor 是一款原生 Windows 托盘应用，让您一目了然地掌握 Claude 和 Codex 用量 - 轻量、免安装、代码完全可审计。Claude 速率限制在 claude.ai、Claude Code、Claude Code Cowork 以及 VS Code 和 JetBrains IDE 扩展之间共享；Codex 用量通过本机 ChatGPT/Codex OAuth 会话读取。托盘、桌面面板、提醒和事件命令帮助您随时了解会话和周限额剩余量。
 
 ![桌面详情窗口展示账户信息和用量进度条](assets/screenshot_CN.png)
 
 ## 功能特性
 
-- **免安装** - 单个 EXE 文件（约 12.5 MB），无需安装、无 Electron、无运行时依赖。下载后放在任意位置即可运行，卸载只需删除文件
+- **免安装** - 单个 EXE 文件（约 9.8 MB），无需安装、无 Electron、无额外运行时依赖。下载后放在任意位置即可运行，卸载只需删除文件
 - **零配置** - 默认以现有 Claude Code 登录作为托盘和提醒的主数据源；如本机已登录 Codex，详情窗口会同时显示 Codex 用量，用量查询无需 API 密钥
 - **实时托盘图标** 带两个[可配置](docs/configuration.md#tray-icon-bars)进度条（默认显示会话和周用量），[可配置工具提示](docs/configuration.md#tooltip-fields)、百分比显示，可通过右键菜单选择托盘显示哪个 provider 的指标（Auto 悬停提示同时显示 Codex 和 Claude，图标进度条仍使用主 provider），以及适配浅色和深色任务栏的主题感知颜色
 - **桌面详情窗口** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。窗口提供 All / Codex / Claude 视图，同时显示两边的 `5h` / `7d` 配额、本地 30 天成本与 Token 估算、重置倒计时以及数据过时指示器
@@ -35,7 +35,7 @@
 - **无动态代码执行** - 不使用 `eval()`、`exec()`、`compile()` 或动态导入
 - **无混淆** - 无编码字符串、无隐藏 URL、无压缩逻辑
 - **模块化架构** - 小而专注的模块，安全关键代码（凭据、API 调用）隔离在 provider 模块中（[`api.py`](src/integrations/api.py)、[`codex_api.py`](src/integrations/codex_api.py)）
-- **最小运行时依赖** - 仅四个知名包：[requests](https://pypi.org/project/requests/)、[Pillow](https://pypi.org/project/pillow/)、[pystray](https://pypi.org/project/pystray/)、[pywebview](https://pypi.org/project/pywebview/)
+- **最小运行时依赖** - 仅使用少量知名依赖：[requests](https://pypi.org/project/requests/) 负责网络请求，[pywebview](https://pypi.org/project/pywebview/) 负责桌面面板；托盘图标和通知使用 Windows 原生 API 实现，不依赖 Pillow 或 pystray
 
 ---
 
@@ -52,7 +52,7 @@
 
 ## 快速开始
 
-**无需安装 Python。** 下载最新的 [**UsageMonitorForClaude.exe**](https://github.com/AlphaBrock/CCMonitor/releases/latest)，放在任意位置运行即可。要卸载，先在右键菜单中禁用「开机启动」（如已启用），然后删除文件。
+**无需安装 Python。** 下载最新的 [**CCMonitor.exe**](https://github.com/AlphaBrock/CCMonitor/releases/latest)，放在任意位置运行即可。要卸载，先在右键菜单中禁用「开机启动」（如已启用），然后删除文件。
 
 ---
 
@@ -74,7 +74,7 @@ Windows 可能默认隐藏新的托盘图标。要保持图标始终可见：
 
 1. 右键点击**任务栏** -> **任务栏设置**
 2. 展开**其他系统托盘图标**（Win 11）或**选择哪些图标显示在任务栏上**（Win 10）
-3. 将 **UsageMonitorForClaude** 切换为**开**
+3. 将 **CCMonitor** 切换为**开**
 
 ### 进度条说明
 
@@ -149,7 +149,7 @@ python -m src
 python scripts/build.py
 ```
 
-生成 `dist/UsageMonitorForClaude.exe`（约 12.5 MB），单文件可执行程序包含 Python 和所有依赖。
+生成 `dist/CCMonitor.exe`（约 9.8 MB），单文件可执行程序包含 Python 和所有依赖。
 
 ### 桌面窗口 UI 开发
 
@@ -170,7 +170,7 @@ start http://localhost:8080/dev.html && python -m http.server 8080 -d src/ui/pop
 5. 运行测试套件：`python -m unittest discover -s tests`
 6. 冒烟测试：`python -m src` - 验证托盘图标、桌面窗口和设置
 7. 使用 `python scripts/build.py` 构建 EXE
-8. 冒烟测试：`dist\UsageMonitorForClaude.exe` - 验证托盘图标、桌面窗口和设置
+8. 冒烟测试：`dist\CCMonitor.exe` - 验证托盘图标、桌面窗口和设置
 9. 暂存步骤 2 到 4 的更改
 10. 提交并推送发布准备
 11. 创建并推送语义化标签（`X.Y.Z`）以触发发布工作流：
@@ -195,12 +195,12 @@ GitHub Actions 工作流 [`.github/workflows/release.yml`](.github/workflows/rel
 <details>
 <summary>面向想要参与项目的开发者</summary>
 
-本项目使用 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 开发。[`.claude/CLAUDE.md`](.claude/CLAUDE.md) 文件包含所有项目规范、编码标准和架构指南 - Claude Code 在开发过程中会自动遵循这些规范。
+本项目面向 Claude Code 与 Codex 的本机用量监控场景开发。[`.claude/CLAUDE.md`](.claude/CLAUDE.md) 文件包含所有项目规范、编码标准和架构指南。
 
 ### 工作流程
 
 1. 阅读 `.claude/CLAUDE.md` 了解项目规范
-2. 使用 Claude Code 实现更改 - 它会自动遵循指南
+2. 按照现有模块边界实现更改，保持凭据、API、托盘和 UI 逻辑可审计
 3. 提交前运行 `/review` 斜杠命令，对所有暂存更改进行系统化质量审查（代码、测试、文档）
 4. 如有修复则暂存，然后运行 `/commit-message` 生成格式规范的提交信息
 
@@ -225,4 +225,4 @@ MIT
 
 ## 免责声明
 
-这是一个独立的社区项目。它**不是**由 [Anthropic](https://www.anthropic.com/) 创建、认可或官方支持的。"Claude" 和 "Anthropic" 是 Anthropic, PBC 的商标。使用这些名称仅用于描述性目的以表明兼容性。
+这是一个独立的社区项目。它**不是**由 [Anthropic](https://www.anthropic.com/) 或 [OpenAI](https://openai.com/) 创建、认可或官方支持的。"Claude" 和 "Anthropic" 是 Anthropic, PBC 的商标；"OpenAI"、"ChatGPT" 和 "Codex" 是 OpenAI 的商标。使用这些名称仅用于描述性目的以表明兼容性。

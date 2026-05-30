@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Usage Monitor for Claude** is a local desktop application that monitors your Claude or Codex API usage.
+**CCMonitor** is a local desktop application that monitors your Claude or Codex API usage.
 
 ## Data Collection
 
@@ -41,4 +41,4 @@ The application does not integrate with any analytics, tracking, advertising, or
 ## Contact
 
 For questions about this privacy policy, please open an issue at
-https://github.com/jens-duttke/usage-monitor-for-claude/issues
+https://github.com/AlphaBrock/CCMonitor/issues

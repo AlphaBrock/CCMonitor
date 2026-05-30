@@ -262,23 +262,29 @@ class TestInitConfig(unittest.TestCase):
 class TestPopupStaticAssets(unittest.TestCase):
     def test_provider_tabs_reference_packaged_svg_assets(self):
         script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+        popup_py = (ROOT / 'src' / 'ui' / 'popup.py').read_text(encoding='utf-8')
 
         self.assertIn('../../../assets/icon/application.svg', script)
         self.assertIn('../../../assets/icon/openai.svg', script)
         self.assertIn('../../../assets/icon/claude-color.svg', script)
         self.assertIn("claude: { path: '../../../assets/icon/claude-color.svg', mode: 'mask' }", script)
+        self.assertIn('createProviderIcon(provider.id', script)
+        self.assertNotIn('◌', script + popup_py)
+        self.assertNotIn('✺', script + popup_py)
+        self.assertNotIn("translations.all || 'All', '▦'", script)
         self.assertNotIn('TAB_ICON_SVG', script)
         self.assertNotIn('<svg', script)
         self.assertNotIn("mode: 'image'", script)
 
-    def test_provider_tab_icon_has_fixed_large_size(self):
+    def test_provider_icons_use_fixed_white_svg_masks(self):
         stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
 
         self.assertIn('.provider-tab-icon', stylesheet)
-        self.assertIn('width: 22px', stylesheet)
-        self.assertIn('height: 22px', stylesheet)
+        self.assertIn('.provider-card-icon', stylesheet)
+        self.assertIn('width: 18px', stylesheet)
+        self.assertIn('height: 18px', stylesheet)
         self.assertIn('color: #ffffff', stylesheet)
-        self.assertIn('.provider-tab-icon-mask', stylesheet)
+        self.assertIn('.provider-icon-mask', stylesheet)
         self.assertIn('mask: var(--provider-icon-url) center / contain no-repeat', stylesheet)
 
     def test_pyinstaller_spec_includes_svg_icons(self):
@@ -286,6 +292,25 @@ class TestPopupStaticAssets(unittest.TestCase):
 
         self.assertIn("'assets' / 'icon' / '*.svg'", spec)
         self.assertIn("'assets/icon'", spec)
+
+    def test_pyinstaller_spec_excludes_unused_webview_runtime_files(self):
+        spec = (ROOT / 'packaging' / 'ccmonitor.spec').read_text(encoding='utf-8')
+
+        self.assertNotIn("'webview/lib/runtimes/win-arm64/'", spec)
+        self.assertNotIn("'webview/lib/runtimes/win-x86/'", spec)
+        self.assertIn("'webview/lib/runtimes/win-arm64/native/webview2loader.dll'", spec)
+        self.assertIn("'webview/lib/runtimes/win-x86/native/webview2loader.dll'", spec)
+        self.assertIn("'webview/lib/runtimes/win-arm64/native'", spec)
+        self.assertIn("'webview/lib/runtimes/win-x86/native'", spec)
+        self.assertIn("'webview/lib/webbrowserinterop.x64.dll'", spec)
+        self.assertIn("'clr_loader/ffi/dlls/x86/'", spec)
+
+    def test_pyinstaller_spec_outputs_ccmonitor_exe(self):
+        spec = (ROOT / 'packaging' / 'ccmonitor.spec').read_text(encoding='utf-8')
+
+        self.assertIn("name='CCMonitor'", spec)
+        old_exe_name = "name='" + 'Usage' + 'Monitor' + 'For' + "Claude'"
+        self.assertNotIn(old_exe_name, spec)
 
 
 class TestUsagePopupWindow(unittest.TestCase):

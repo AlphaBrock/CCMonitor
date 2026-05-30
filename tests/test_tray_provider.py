@@ -17,13 +17,13 @@ from unittest.mock import MagicMock, patch
 from src.integrations.local_usage import _CLAUDE_PRICING, _claude_cost
 from src.presentation import settings
 from src.presentation.formatting import format_dashboard_tooltip, provider_label
-from src.runtime.app import UsageMonitorForClaude
+from src.runtime.app import CCMonitor
 
 
-def _make_render_app() -> UsageMonitorForClaude:
+def _make_render_app() -> CCMonitor:
     """Create an app instance with ``__init__`` stubbed for unit testing."""
-    with patch.object(UsageMonitorForClaude, '__init__', lambda self: None):
-        return UsageMonitorForClaude()
+    with patch.object(CCMonitor, '__init__', lambda self: None):
+        return CCMonitor()
 
 
 class TestProviderLabel(unittest.TestCase):

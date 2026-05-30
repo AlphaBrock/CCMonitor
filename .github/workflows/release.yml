@@ -56,4 +56,4 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           body_path: release_notes.md
-          files: dist/UsageMonitorForClaude.exe
+          files: dist/CCMonitor.exe

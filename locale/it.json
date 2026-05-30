@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Mostra utilizzo Claude",
     "tooltip_title": "Utilizzo Claude",
@@ -68,7 +68,7 @@
     "status_updated_s": "Aggiornato {s}s fa",
     "status_next_update": "Prossimo aggiornamento tra {duration}",
     "status_refreshing": "Aggiornamento...",
-    "already_running": "Usage Monitor for Claude v{running_version} è già in esecuzione.\n\nVuoi sostituire l'istanza in esecuzione?",
+    "already_running": "CCMonitor v{running_version} è già in esecuzione.\n\nVuoi sostituire l'istanza in esecuzione?",
     "pin_on": "Fissato",
     "pin_off": "Non fissato",
     "menu_language": "Lingua",

@@ -1,54 +1,144 @@
 """
-Tray Icon
-==========
-
-Creates monochrome system tray icons and detects the Windows taskbar theme.
+-------------------------------------------------
+   File Name   :     tray_icon.py
+   Description :     原生托盘图标位图渲染
+   Company     :     JohnWick
+   Author      :     linjcciam1314@gmail.com
+   Date        :     2026-05-29
+-------------------------------------------------
 """
 from __future__ import annotations
 
 import ctypes
-import functools
-import os
 import winreg
-from typing import Callable
+from dataclasses import dataclass
+from typing import Callable, Iterable
 
-from PIL import Image, ImageDraw, ImageFont
+from ctypes import wintypes
 
 from src.presentation.settings import ICON_DARK, ICON_LIGHT
 
-__all__ = ['load_font', 'taskbar_uses_light_theme', 'watch_theme_change', 'create_icon_image', 'create_status_image']
+__all__ = ['TrayIconBitmap', 'taskbar_uses_light_theme', 'watch_theme_change', 'create_icon_image', 'create_status_image']
 
-# Theme registry
 THEME_REG_KEY = r'Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
 THEME_REG_VALUE = 'SystemUsesLightTheme'
 REG_NOTIFY_CHANGE_LAST_SET = 0x00000004
 
-TRANSPARENT = (0, 0, 0, 0)
+_SIZE = 64
+_TEXT_SCALE = 4
+_MAIN_TEXT_AREA = 43
+
+FW_BOLD = 700
+TRANSPARENT_BK = 1
+ANTIALIASED_QUALITY = 4
+CLEARTYPE_QUALITY = 5
+DT_CENTER = 0x00000001
+DT_VCENTER = 0x00000004
+DT_SINGLELINE = 0x00000020
+DT_NOCLIP = 0x00000100
+BI_RGB = 0
+DIB_RGB_COLORS = 0
 
 
-@functools.lru_cache(maxsize=None)
-def load_font(size: int, symbol: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    """Load font at given size. Use symbol=True for Unicode glyphs not in Arial."""
-    windir = os.environ.get('WINDIR', 'C:\\Windows')
-    if symbol:
-        names = (f'{windir}\\Fonts\\seguisym.ttf', 'seguisym.ttf')
-    else:
-        names = (f'{windir}\\Fonts\\arialbd.ttf', 'arialbd.ttf', f'{windir}\\Fonts\\arial.ttf', 'arial.ttf')
-    for name in names:
-        try:
-            return ImageFont.truetype(name, size)
-        except OSError:
-            continue
+class BITMAPINFOHEADER(ctypes.Structure):
+    _fields_ = [
+        ('biSize', wintypes.DWORD),
+        ('biWidth', ctypes.c_long),
+        ('biHeight', ctypes.c_long),
+        ('biPlanes', wintypes.WORD),
+        ('biBitCount', wintypes.WORD),
+        ('biCompression', wintypes.DWORD),
+        ('biSizeImage', wintypes.DWORD),
+        ('biXPelsPerMeter', ctypes.c_long),
+        ('biYPelsPerMeter', ctypes.c_long),
+        ('biClrUsed', wintypes.DWORD),
+        ('biClrImportant', wintypes.DWORD),
+    ]
 
-    return ImageFont.load_default()
+
+class BITMAPINFO(ctypes.Structure):
+    _fields_ = [
+        ('bmiHeader', BITMAPINFOHEADER),
+        ('bmiColors', wintypes.DWORD * 1),
+    ]
+
+
+@dataclass(frozen=True)
+class TrayIconBitmap:
+    """托盘图标 BGRA 位图。"""
+
+    width: int
+    height: int
+    pixels: bytes
+
+    @property
+    def size(self) -> tuple[int, int]:
+        return self.width, self.height
+
+    @property
+    def mode(self) -> str:
+        return 'BGRA'
+
+    def tobytes(self) -> bytes:
+        return self.pixels
+
+    def rgba_at(self, x: int, y: int) -> tuple[int, int, int, int]:
+        """按 RGBA 顺序读取单个像素，便于测试断言。"""
+        index = (y * self.width + x) * 4
+        blue, green, red, alpha = self.pixels[index:index + 4]
+        return red, green, blue, alpha
+
+
+class _Canvas:
+    """64x64 BGRA 画布。"""
+
+    def __init__(self, width: int = _SIZE, height: int = _SIZE) -> None:
+        self.width = width
+        self.height = height
+        self.pixels = bytearray(width * height * 4)
+
+    def fill_rect(self, left: int, top: int, right: int, bottom: int, color: tuple[int, int, int, int]) -> None:
+        """填充矩形，坐标包含右下边界。"""
+        min_x = max(0, left)
+        max_x = min(self.width - 1, right)
+        min_y = max(0, top)
+        max_y = min(self.height - 1, bottom)
+        if min_x > max_x or min_y > max_y:
+            return
+
+        red, green, blue, alpha = color
+        for y in range(min_y, max_y + 1):
+            row = y * self.width * 4
+            for x in range(min_x, max_x + 1):
+                index = row + x * 4
+                self.pixels[index:index + 4] = bytes((blue, green, red, alpha))
+
+    def blend_mask(self, mask: bytes, mask_width: int, mask_height: int, left: int, top: int, color: tuple[int, int, int, int]) -> None:
+        """按灰度蒙版把文字混合到透明 BGRA 画布。"""
+        red, green, blue, alpha = color
+        for y in range(mask_height):
+            target_y = top + y
+            if target_y < 0 or target_y >= self.height:
+                continue
+            row = target_y * self.width * 4
+            mask_row = y * mask_width
+            for x in range(mask_width):
+                target_x = left + x
+                if target_x < 0 or target_x >= self.width:
+                    continue
+                mask_alpha = mask[mask_row + x]
+                if not mask_alpha:
+                    continue
+                effective_alpha = mask_alpha * alpha // 255
+                index = row + target_x * 4
+                self.pixels[index:index + 4] = bytes((blue, green, red, effective_alpha))
+
+    def to_bitmap(self) -> TrayIconBitmap:
+        return TrayIconBitmap(self.width, self.height, bytes(self.pixels))
 
 
 def taskbar_uses_light_theme() -> bool:
-    """Return True if the Windows taskbar uses the light theme.
-
-    Reads ``SystemUsesLightTheme`` from the Personalize registry key.
-    Returns False (dark) if the value cannot be read.
-    """
+    """读取 Windows 任务栏是否为浅色主题。"""
     try:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, THEME_REG_KEY) as key:
             value, _ = winreg.QueryValueEx(key, THEME_REG_VALUE)
@@ -58,11 +148,7 @@ def taskbar_uses_light_theme() -> bool:
 
 
 def watch_theme_change(callback: Callable[[], None]) -> None:
-    """Block the current thread and call *callback* whenever the taskbar theme changes.
-
-    Uses ``RegNotifyChangeKeyValue`` to sleep until the registry key
-    is modified, avoiding any polling.  Designed to run in a daemon thread.
-    """
+    """阻塞等待系统主题变化，并在变化后执行回调。"""
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, THEME_REG_KEY, 0, winreg.KEY_READ) as key:
         while True:
             if ctypes.windll.advapi32.RegNotifyChangeKeyValue(int(key), False, REG_NOTIFY_CHANGE_LAST_SET, None, False) != 0:
@@ -75,95 +161,216 @@ def create_icon_image(
     *, mode_top: str = 'utilization', mode_bottom: str = 'utilization',
     time_pct_top: float | None = None, time_pct_bottom: float | None = None,
     extra_usage_available: bool = False,
-) -> Image.Image:
-    """Create monochrome tray icon: 'C' letter + two usage bars.
-
-    Parameters
-    ----------
-    pct_top : float
-        Utilization percentage (0-100) for the upper bar.
-    pct_bottom : float
-        Utilization percentage (0-100) for the lower bar.
-    light_taskbar : bool
-        Use dark-on-light colors for a light taskbar.
-    mode_top : str
-        Display mode for the upper bar: ``'utilization'`` (linear fill)
-        or ``'overage'`` (fills as usage exceeds the time marker).
-    mode_bottom : str
-        Display mode for the lower bar.  Same semantics as *mode_top*.
-    time_pct_top : float or None
-        Elapsed-time percentage for the upper bar.  Required for ``overage``
-        mode; ignored otherwise.
-    time_pct_bottom : float or None
-        Elapsed-time percentage for the lower bar.  Same semantics as
-        *time_pct_top*.
-    extra_usage_available : bool
-        True if the account has paid extra-usage credits still available.
-        When a quota is fully exhausted, this decides whether to show ``$``
-        (continuing costs money) or ``✕`` (fully blocked).
-    """
+) -> TrayIconBitmap:
+    """创建主托盘图标位图。"""
     colors = ICON_DARK if light_taskbar else ICON_LIGHT
-    fg, fg_half = colors['fg'], colors['fg_half']
+    foreground = _rgba(colors['fg'])
+    foreground_half = _rgba(colors['fg_half'])
+    canvas = _Canvas()
 
-    S = 64
-    img = Image.new('RGBA', (S, S), TRANSPARENT)
-    draw = ImageDraw.Draw(img)
-
-    # Top glyph: "✕" when any quota exhausted and no extra credits left,
-    # "$" when exhausted but paid extra-usage still available,
-    # "C" while usage is still zero, otherwise the percentage.
-    stroke_width = 0
     any_exhausted = pct_top >= 100 or pct_bottom >= 100
     if any_exhausted and not extra_usage_available:
-        text, font = '\u2715', load_font(36, symbol=True)
-        stroke_width = 2
+        text = '✕'
     elif any_exhausted:
-        text, font = '$', load_font(42)
-        stroke_width = 2
+        text = '$'
     elif pct_top > 0:
-        text, font = f'{pct_top:.0f}', load_font(40)
+        text = f'{pct_top:.0f}'
     else:
-        text, font = 'C', load_font(42)
+        text = 'C'
 
-    bbox = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
-    tw = bbox[2] - bbox[0]
-    draw.text(((S - tw) / 2 - bbox[0], -bbox[1]), text, fill=fg, font=font, stroke_width=stroke_width, stroke_fill=fg)
+    _draw_text(canvas, text, foreground, area_height=_MAIN_TEXT_AREA, font_size=_main_text_size(text), symbol=text == '✕')
+    _draw_bars(canvas, foreground, foreground_half, ((pct_top, mode_top, time_pct_top), (pct_bottom, mode_bottom, time_pct_bottom)))
+    return canvas.to_bitmap()
 
-    # Progress bars - full width, flush to bottom
-    bar_h = 9
+
+def create_status_image(text: str, light_taskbar: bool = False) -> TrayIconBitmap:
+    """创建错误或状态托盘图标位图。"""
+    colors = ICON_DARK if light_taskbar else ICON_LIGHT
+    foreground = _rgba(colors['fg_dim'])
+    canvas = _Canvas()
+    _draw_text(canvas, text, foreground, area_height=_SIZE, font_size=_status_text_size(text), symbol=False)
+    return canvas.to_bitmap()
+
+
+def _draw_bars(
+    canvas: _Canvas,
+    foreground: tuple[int, int, int, int],
+    background: tuple[int, int, int, int],
+    bars: Iterable[tuple[float, str, float | None]],
+) -> None:
+    bar_height = 9
     gap = 3
-    bar2_y = S - bar_h
-    bar1_y = bar2_y - gap - bar_h
+    positions = (_SIZE - bar_height - gap - bar_height, _SIZE - bar_height)
 
-    for y, pct, mode, time_pct in (
-        (bar1_y, pct_top, mode_top, time_pct_top),
-        (bar2_y, pct_bottom, mode_bottom, time_pct_bottom),
-    ):
-        draw.rectangle([0, y, S - 1, y + bar_h - 1], fill=fg_half)
-        if mode == 'overage' and time_pct is not None and time_pct < 100:
-            overage = max(0.0, pct - time_pct)
-            fill_ratio = min(1.0, overage / (100 - time_pct))
-            fill_w = max(0, int(S * fill_ratio))
-            if fill_w > 0:
-                draw.rectangle([0, y, fill_w - 1, y + bar_h - 1], fill=fg)
-        else:
-            fill_w = max(0, min(S, int(S * pct / 100)))
-            if fill_w > 0:
-                draw.rectangle([0, y, fill_w - 1, y + bar_h - 1], fill=fg)
-
-    return img
+    for y, (pct, mode, time_pct) in zip(positions, bars):
+        canvas.fill_rect(0, y, _SIZE - 1, y + bar_height - 1, background)
+        fill_width = _bar_fill_width(pct, mode, time_pct)
+        if fill_width > 0:
+            canvas.fill_rect(0, y, fill_width - 1, y + bar_height - 1, foreground)
 
 
-def create_status_image(text: str, light_taskbar: bool = False) -> Image.Image:
-    """Create monochrome centered-text icon for error/status states."""
-    fg_dim = (ICON_DARK if light_taskbar else ICON_LIGHT)['fg_dim']
+def _bar_fill_width(pct: float, mode: str, time_pct: float | None) -> int:
+    if mode == 'overage' and time_pct is not None and time_pct < 100:
+        overage = max(0.0, pct - time_pct)
+        return max(0, min(_SIZE, int(_SIZE * min(1.0, overage / (100 - time_pct)))))
+    return max(0, min(_SIZE, int(_SIZE * pct / 100)))
 
-    S = 64
-    img = Image.new('RGBA', (S, S), TRANSPARENT)
-    draw = ImageDraw.Draw(img)
-    font = load_font(46)
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    draw.text(((S - tw) / 2 - bbox[0], (S - th) / 2 - bbox[1]), text, fill=fg_dim, font=font)
 
-    return img
+def _draw_text(canvas: _Canvas, text: str, color: tuple[int, int, int, int], *, area_height: int, font_size: int, symbol: bool) -> None:
+    mask = _render_text_mask(text, area_height=area_height, font_size=font_size, symbol=symbol)
+    canvas.blend_mask(mask, _SIZE, area_height, 0, 0, color)
+
+
+def _render_text_mask(text: str, *, area_height: int, font_size: int, symbol: bool) -> bytes:
+    _configure_gdi_text_api()
+
+    width = _SIZE * _TEXT_SCALE
+    height = area_height * _TEXT_SCALE
+    byte_count = width * height * 4
+    info = BITMAPINFO(
+        BITMAPINFOHEADER(
+            biSize=ctypes.sizeof(BITMAPINFOHEADER),
+            biWidth=width,
+            biHeight=-height,
+            biPlanes=1,
+            biBitCount=32,
+            biCompression=BI_RGB,
+            biSizeImage=byte_count,
+            biXPelsPerMeter=0,
+            biYPelsPerMeter=0,
+            biClrUsed=0,
+            biClrImportant=0,
+        ),
+        (wintypes.DWORD * 1)(0),
+    )
+    bits = ctypes.c_void_p()
+    hdc = ctypes.windll.gdi32.CreateCompatibleDC(None)
+    if not hdc:
+        return bytes(_SIZE * area_height)
+
+    hbitmap = None
+    font = None
+    old_bitmap = None
+    old_font = None
+    try:
+        info_pointer = ctypes.cast(ctypes.byref(info), ctypes.c_void_p)
+        hbitmap = ctypes.windll.gdi32.CreateDIBSection(hdc, info_pointer, DIB_RGB_COLORS, ctypes.byref(bits), None, 0)
+        if not hbitmap or not bits.value:
+            return bytes(_SIZE * area_height)
+        ctypes.memset(bits, 0, byte_count)
+        old_bitmap = ctypes.windll.gdi32.SelectObject(hdc, hbitmap)
+
+        face_name = 'Segoe UI Symbol' if symbol else 'Arial'
+        font = ctypes.windll.gdi32.CreateFontW(
+            -font_size * _TEXT_SCALE,
+            0,
+            0,
+            0,
+            FW_BOLD,
+            False,
+            False,
+            False,
+            0,
+            0,
+            0,
+            CLEARTYPE_QUALITY,
+            0,
+            face_name,
+        )
+        if not font:
+            return bytes(_SIZE * area_height)
+        old_font = ctypes.windll.gdi32.SelectObject(hdc, font)
+        ctypes.windll.gdi32.SetBkMode(hdc, TRANSPARENT_BK)
+        ctypes.windll.gdi32.SetTextColor(hdc, 0x00FFFFFF)
+        rect = wintypes.RECT(0, 0, width, height)
+        ctypes.windll.user32.DrawTextW(hdc, text, len(text), ctypes.byref(rect), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOCLIP)
+        source = ctypes.string_at(bits, byte_count)
+        return _downsample_text_mask(source, width, height, area_height)
+    finally:
+        if old_font:
+            ctypes.windll.gdi32.SelectObject(hdc, old_font)
+        if old_bitmap:
+            ctypes.windll.gdi32.SelectObject(hdc, old_bitmap)
+        if font:
+            ctypes.windll.gdi32.DeleteObject(font)
+        if hbitmap:
+            ctypes.windll.gdi32.DeleteObject(hbitmap)
+        ctypes.windll.gdi32.DeleteDC(hdc)
+
+
+def _downsample_text_mask(source: bytes, source_width: int, source_height: int, target_height: int) -> bytes:
+    target = bytearray(_SIZE * target_height)
+    scale_area = _TEXT_SCALE * _TEXT_SCALE
+    for target_y in range(target_height):
+        for target_x in range(_SIZE):
+            total = 0
+            for offset_y in range(_TEXT_SCALE):
+                source_y = target_y * _TEXT_SCALE + offset_y
+                row = source_y * source_width * 4
+                for offset_x in range(_TEXT_SCALE):
+                    source_x = target_x * _TEXT_SCALE + offset_x
+                    index = row + source_x * 4
+                    blue = source[index]
+                    green = source[index + 1]
+                    red = source[index + 2]
+                    total += max(red, green, blue)
+            target[target_y * _SIZE + target_x] = min(255, total // scale_area)
+    return bytes(target)
+
+
+def _configure_gdi_text_api() -> None:
+    gdi32 = ctypes.windll.gdi32
+    user32 = ctypes.windll.user32
+    gdi32.CreateCompatibleDC.argtypes = [wintypes.HDC]
+    gdi32.CreateCompatibleDC.restype = wintypes.HDC
+    gdi32.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.c_void_p, wintypes.UINT, ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD]
+    gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+    gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+    gdi32.SelectObject.restype = wintypes.HGDIOBJ
+    gdi32.CreateFontW.argtypes = [
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.DWORD,
+        wintypes.LPCWSTR,
+    ]
+    gdi32.CreateFontW.restype = wintypes.HFONT
+    gdi32.SetBkMode.argtypes = [wintypes.HDC, ctypes.c_int]
+    gdi32.SetBkMode.restype = ctypes.c_int
+    gdi32.SetTextColor.argtypes = [wintypes.HDC, wintypes.COLORREF]
+    gdi32.SetTextColor.restype = wintypes.COLORREF
+    gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+    gdi32.DeleteObject.restype = wintypes.BOOL
+    gdi32.DeleteDC.argtypes = [wintypes.HDC]
+    gdi32.DeleteDC.restype = wintypes.BOOL
+    user32.DrawTextW.argtypes = [wintypes.HDC, wintypes.LPCWSTR, ctypes.c_int, ctypes.POINTER(wintypes.RECT), wintypes.UINT]
+    user32.DrawTextW.restype = ctypes.c_int
+
+
+def _main_text_size(text: str) -> int:
+    if text in {'C', '✕', '$'}:
+        return 36
+    if len(text) <= 2:
+        return 31
+    return 25
+
+
+def _status_text_size(text: str) -> int:
+    if len(text) <= 1:
+        return 42
+    if len(text) == 2:
+        return 34
+    return 28
+
+
+def _rgba(value: list[int] | tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    return int(value[0]), int(value[1]), int(value[2]), int(value[3])

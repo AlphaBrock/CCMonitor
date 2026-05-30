@@ -101,11 +101,26 @@ function updateData(data) {
 }
 
 function renderSwitcher(providers) {
-    const buttons = [createSwitcherButton('all', translations.all || 'All', '▦')];
+    const buttons = [createSwitcherButton('all', translations.all || 'All', '')];
     for (const provider of providers) {
         buttons.push(createSwitcherButton(provider.id, provider.title, provider.icon));
     }
     els.switcher.replaceChildren(...buttons);
+}
+
+function createProviderIcon(viewId, fallbackText, className) {
+    const icon = document.createElement('span');
+    icon.className = className;
+    const asset = TAB_ICON_ASSETS[viewId];
+    if (asset?.mode === 'mask') {
+        icon.classList.add('provider-icon-mask');
+        icon.style.setProperty('--provider-icon-url', `url("${asset.path}")`);
+    } else if (fallbackText) {
+        icon.textContent = fallbackText;
+    } else {
+        icon.classList.add('provider-icon-empty');
+    }
+    return icon;
 }
 
 function createSwitcherButton(viewId, labelText, iconText) {
@@ -115,16 +130,7 @@ function createSwitcherButton(viewId, labelText, iconText) {
     button.classList.toggle('active', activeView === viewId);
     button.dataset.view = viewId;
 
-    const icon = document.createElement('span');
-    icon.className = 'provider-tab-icon';
-    const asset = TAB_ICON_ASSETS[viewId];
-    if (asset?.mode === 'mask') {
-        icon.classList.add('provider-tab-icon-mask');
-        icon.style.setProperty('--provider-icon-url', `url("${asset.path}")`);
-    } else {
-        icon.textContent = iconText;
-    }
-
+    const icon = createProviderIcon(viewId, iconText, 'provider-tab-icon');
     const label = document.createElement('span');
     label.textContent = labelText;
 
@@ -153,12 +159,16 @@ function createProviderCard(provider) {
     header.className = 'provider-card-head';
 
     const titleWrap = document.createElement('div');
+    const titleRow = document.createElement('div');
+    titleRow.className = 'provider-title-row';
+    const titleIcon = createProviderIcon(provider.id, provider.icon, 'provider-card-icon');
     const title = document.createElement('h2');
     title.textContent = provider.title;
+    titleRow.append(titleIcon, title);
     const status = document.createElement('div');
     status.className = 'provider-status';
     status.dataset.providerStatus = provider.id;
-    titleWrap.append(title, status);
+    titleWrap.append(titleRow, status);
 
     const plan = document.createElement('div');
     plan.className = 'provider-plan';

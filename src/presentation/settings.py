@@ -88,7 +88,7 @@ def _load_settings() -> dict:
             except (json.JSONDecodeError, ValueError) as exc:
                 ctypes.windll.user32.MessageBoxW(
                     0, f'Invalid JSON in settings file:\n{path}\n\n{exc}',
-                    'Usage Monitor for Claude - Settings Error', 0x30,
+                    'CCMonitor - Settings Error', 0x30,
                 )
                 return {}
             except OSError:
@@ -255,7 +255,7 @@ def _validate(data: dict, path: Path) -> dict:
     if errors:
         ctypes.windll.user32.MessageBoxW(
             0, f'Invalid values in settings file:\n{path}\n\n' + '\n'.join(errors),
-            'Usage Monitor for Claude - Settings Error', 0x30,
+            'CCMonitor - Settings Error', 0x30,
         )
 
     return data

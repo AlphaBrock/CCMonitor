@@ -11,13 +11,13 @@ import unittest
 from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
-from src.runtime.app import UsageMonitorForClaude
-from src.runtime.cache import UpdateResult
+from src.runtime.app import CCMonitor
+from src.runtime.cache import DashboardUpdateResult, UpdateResult
 from src.integrations.claude_cli import RefreshResult
 
 
-def _make_app(thresholds: list[float] | None = None) -> UsageMonitorForClaude:
-    """Create a UsageMonitorForClaude with mocked icon and configurable thresholds.
+def _make_app(thresholds: list[float] | None = None) -> CCMonitor:
+    """Create a CCMonitor with mocked icon and configurable thresholds.
 
     Parameters
     ----------
@@ -26,10 +26,10 @@ def _make_app(thresholds: list[float] | None = None) -> UsageMonitorForClaude:
     """
     if thresholds is None:
         thresholds = [80, 95]
-    with patch('src.runtime.app.pystray'), \
+    with patch('src.runtime.app.tray'), \
          patch('src.runtime.app.create_icon_image'), \
          patch('src.runtime.app.taskbar_uses_light_theme', return_value=False):
-        app = UsageMonitorForClaude()
+        app = CCMonitor()
     app.icon = MagicMock()
     app._locked_patch = patch('src.runtime.app.is_workstation_locked', return_value=False)
     app._locked_patch.start()
@@ -40,7 +40,7 @@ def _make_app(thresholds: list[float] | None = None) -> UsageMonitorForClaude:
     return app
 
 
-def _cleanup(app: UsageMonitorForClaude) -> None:
+def _cleanup(app: CCMonitor) -> None:
     """Stop patches started by _make_app."""
     app._idle_patch.stop()
     app._locked_patch.stop()
@@ -857,6 +857,26 @@ class TestRenderTray(unittest.TestCase):
 
     def tearDown(self):
         _cleanup(self.app)
+
+    @patch('src.runtime.app.create_icon_image')
+    def test_skipped_update_uses_dashboard_snapshot_for_tooltip(self, _icon):
+        """轮询被跳过时，托盘提示仍会复用 dashboard cache 中已有的数据。"""
+        self.app.dashboard_cache.caches['codex']._usage = {'five_hour': {'utilization': 12.0}}
+        self.app.dashboard_cache.caches['claude']._usage = {'five_hour': {'utilization': 34.0}}
+        self.app.dashboard_cache.update_all = MagicMock(return_value=DashboardUpdateResult(
+            primary=UpdateResult(data=None),
+            providers={
+                'codex': UpdateResult(data=None),
+                'claude': UpdateResult(data=None),
+            },
+        ))
+
+        self.app.update()
+
+        self.assertIn('Codex', self.app.icon.title)
+        self.assertIn('5h 12%', self.app.icon.title)
+        self.assertIn('Claude', self.app.icon.title)
+        self.assertIn('5h 34%', self.app.icon.title)
 
     @patch('src.runtime.app.format_dashboard_tooltip', return_value='Usage: 42%')
     @patch('src.runtime.app.create_icon_image')

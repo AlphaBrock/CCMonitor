@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Claude使用状況を表示",
     "tooltip_title": "Claude使用状況",
@@ -68,7 +68,7 @@
     "status_updated_s": "{s}秒前に更新",
     "status_next_update": "次の更新まで{duration}",
     "status_refreshing": "更新中...",
-    "already_running": "Usage Monitor for Claude v{running_version} は既に実行中です。\n\n実行中のインスタンスを置き換えますか？",
+    "already_running": "CCMonitor v{running_version} は既に実行中です。\n\n実行中のインスタンスを置き換えますか？",
     "pin_on": "固定済み",
     "pin_off": "固定解除",
     "menu_language": "言語",

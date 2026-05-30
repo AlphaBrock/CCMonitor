@@ -67,7 +67,7 @@ _EXTENSION_PREFIX = 'anthropic.claude-code-'
 CHANGELOG_URL = 'https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md'
 PROJECT_URL = 'https://github.com/AlphaBrock/CCMonitor'
 RELEASES_API_URL = 'https://api.github.com/repos/AlphaBrock/CCMonitor/releases/latest'
-RELEASE_ASSET_NAME = 'UsageMonitorForClaude.exe'
+RELEASE_ASSET_NAME = 'CCMonitor.exe'
 RELEASE_API_HEADERS = {
     'Accept': 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',

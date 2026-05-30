@@ -12,7 +12,7 @@ import winreg
 __all__ = ['AUTOSTART_REG_KEY', 'AUTOSTART_REG_NAME', 'is_autostart_enabled', 'set_autostart', 'sync_autostart_path']
 
 AUTOSTART_REG_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
-AUTOSTART_REG_NAME = 'UsageMonitorForClaude'
+AUTOSTART_REG_NAME = 'CCMonitor'
 
 
 def is_autostart_enabled() -> bool:

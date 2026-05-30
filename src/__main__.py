@@ -68,7 +68,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     import webview  # type: ignore[import-untyped]  # no type stubs available
 
-    from src.runtime.app import UsageMonitorForClaude, crash_log
+    from src.runtime.app import CCMonitor, crash_log
     from src.runtime.single_instance import ensure_single_instance, release_instance_lock
 
     if verbose:
@@ -86,9 +86,9 @@ def main(argv: Sequence[str] | None = None) -> None:
 
                 print_runtime_diagnostics()
 
-            _verbose_step('UsageMonitorForClaude()...', verbose)
-            app = UsageMonitorForClaude()
-            _verbose_step('UsageMonitorForClaude()... OK', verbose)
+            _verbose_step('CCMonitor()...', verbose)
+            app = CCMonitor()
+            _verbose_step('CCMonitor()... OK', verbose)
 
             _verbose_step('app.run...', verbose)
             app.run()

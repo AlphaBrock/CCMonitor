@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "用量监控",
     "menu_show": "显示Claude用量",
     "tooltip_title": "Claude用量",
@@ -68,7 +68,7 @@
     "status_updated_s": "{s}秒前更新",
     "status_next_update": "{duration}后更新",
     "status_refreshing": "刷新中...",
-    "already_running": "Usage Monitor for Claude v{running_version} 已在运行中。\n\n是否要替换正在运行的实例？",
+    "already_running": "CCMonitor v{running_version} 已在运行中。\n\n是否要替换正在运行的实例？",
     "pin_on": "已置顶",
     "pin_off": "未置顶",
     "menu_language": "语言",

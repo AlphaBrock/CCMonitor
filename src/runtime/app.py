@@ -16,8 +16,6 @@ import webbrowser
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import pystray  # type: ignore[import-untyped]  # no type stubs available
-
 from .cache import DashboardCache, UsageCache
 from .idle import get_idle_seconds, is_workstation_locked
 from src.integrations.api import api_headers, auth_warning_text
@@ -33,10 +31,11 @@ from src.presentation.settings import (
     POLL_ERROR, POLL_FAST, POLL_FAST_EXTRA, POLL_INTERVAL, TRAY_PROVIDER, get_alert_thresholds,
     save_language_setting, save_tray_provider,
 )
+from src.ui import win_tray as tray
 from src.ui.popup import UsagePopup
 from src.ui.tray_icon import create_icon_image, create_status_image, taskbar_uses_light_theme, watch_theme_change
 
-__all__ = ['UsageMonitorForClaude', 'crash_log']
+__all__ = ['CCMonitor', 'crash_log']
 
 
 def _future_iso(**kwargs: float) -> str:
@@ -44,8 +43,8 @@ def _future_iso(**kwargs: float) -> str:
     return (datetime.now(timezone.utc) + timedelta(**kwargs)).isoformat()
 
 
-class UsageMonitorForClaude:
-    """System tray application displaying Claude usage."""
+class CCMonitor:
+    """System tray application displaying Claude and Codex usage."""
 
     def __init__(self) -> None:
         """Set up the tray icon with context menu and polling state."""
@@ -84,55 +83,55 @@ class UsageMonitorForClaude:
 
         self._update_checking = False
 
-        self.icon = pystray.Icon(
+        self.icon = tray.Icon(
             'usage_monitor',
             icon=create_icon_image(0, 0, self._light_taskbar),
             title=T['loading'],
-            menu=pystray.Menu(
-                pystray.MenuItem(T['menu_show'], self.on_show_popup, default=True),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem(
+            menu=tray.Menu(
+                tray.MenuItem(T['menu_show'], self.on_show_popup, default=True),
+                tray.SEPARATOR,
+                tray.MenuItem(
                     T['autostart'], self.on_toggle_autostart,
                     checked=lambda item: is_autostart_enabled(),
                     visible=getattr(sys, 'frozen', False),
                 ),
-                pystray.MenuItem(T['menu_provider'], pystray.Menu(
-                    pystray.MenuItem(
+                tray.MenuItem(T['menu_provider'], tray.Menu(
+                    tray.MenuItem(
                         T['provider_auto'], self._make_provider_handler('auto'),
                         checked=lambda item: self._tray_provider == 'auto', radio=True,
                     ),
-                    pystray.Menu.SEPARATOR,
-                    pystray.MenuItem(
+                    tray.SEPARATOR,
+                    tray.MenuItem(
                         'Claude', self._make_provider_handler('claude'),
                         checked=lambda item: self._tray_provider == 'claude', radio=True,
                     ),
-                    pystray.MenuItem(
+                    tray.MenuItem(
                         'Codex', self._make_provider_handler('codex'),
                         checked=lambda item: self._tray_provider == 'codex', radio=True,
                     ),
                 )),
-                pystray.MenuItem(T['menu_language'], pystray.Menu(
-                    pystray.MenuItem(
+                tray.MenuItem(T['menu_language'], tray.Menu(
+                    tray.MenuItem(
                         T['menu_language_auto'],
                         self._make_lang_handler(''),
                         checked=lambda item: not LANGUAGE,
                     ),
-                    pystray.Menu.SEPARATOR,
+                    tray.SEPARATOR,
                     *self._build_language_items(),
                 )),
-                pystray.MenuItem(T['test_commands'], pystray.Menu(
-                    pystray.MenuItem(T['test_reset_5h'], self.on_test_reset_5h, enabled=bool(ON_RESET_COMMAND)),
-                    pystray.MenuItem(T['test_reset_7d'], self.on_test_reset_7d, enabled=bool(ON_RESET_COMMAND)),
-                    pystray.MenuItem(T['test_threshold_5h'], self.on_test_threshold_5h, enabled=bool(ON_THRESHOLD_COMMAND)),
-                    pystray.MenuItem(T['test_threshold_7d'], self.on_test_threshold_7d, enabled=bool(ON_THRESHOLD_COMMAND)),
-                    pystray.MenuItem(T['test_startup'], self.on_test_startup, enabled=bool(ON_STARTUP_COMMAND)),
+                tray.MenuItem(T['test_commands'], tray.Menu(
+                    tray.MenuItem(T['test_reset_5h'], self.on_test_reset_5h, enabled=bool(ON_RESET_COMMAND)),
+                    tray.MenuItem(T['test_reset_7d'], self.on_test_reset_7d, enabled=bool(ON_RESET_COMMAND)),
+                    tray.MenuItem(T['test_threshold_5h'], self.on_test_threshold_5h, enabled=bool(ON_THRESHOLD_COMMAND)),
+                    tray.MenuItem(T['test_threshold_7d'], self.on_test_threshold_7d, enabled=bool(ON_THRESHOLD_COMMAND)),
+                    tray.MenuItem(T['test_startup'], self.on_test_startup, enabled=bool(ON_STARTUP_COMMAND)),
                 ), enabled=bool(ON_RESET_COMMAND or ON_STARTUP_COMMAND or ON_THRESHOLD_COMMAND)),
-                pystray.MenuItem(T['check_update'], self.on_check_update),
-                pystray.MenuItem(T['restart'], self.on_restart),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem(T['menu_project'], self.on_open_project),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem(T['quit'], self.on_quit),
+                tray.MenuItem(T['check_update'], self.on_check_update),
+                tray.MenuItem(T['restart'], self.on_restart),
+                tray.SEPARATOR,
+                tray.MenuItem(T['menu_project'], self.on_open_project),
+                tray.SEPARATOR,
+                tray.MenuItem(T['quit'], self.on_quit),
             ),
         )
 
@@ -180,10 +179,10 @@ class UsageMonitorForClaude:
             self._update_checking = False
 
     def _build_language_items(self) -> list:
-        """Build pystray MenuItems for each available language."""
+        """Build tray menu items for each available language."""
         items = []
         for code, name in available_languages():
-            items.append(pystray.MenuItem(
+            items.append(tray.MenuItem(
                 name,
                 self._make_lang_handler(code),
                 checked=lambda item, c=code: ACTIVE_LANG == c and bool(LANGUAGE),
@@ -293,8 +292,33 @@ class UsageMonitorForClaude:
             return self._last_response
         return self._last_responses.get(self._tray_provider, {})
 
+    def _sync_tray_responses_from_cache(self) -> bool:
+        """从 dashboard cache 补齐托盘提示需要的 provider 数据。"""
+        changed = False
+        snapshot = self.dashboard_cache.snapshot
+        for provider_id, provider_snapshot in snapshot.providers.items():
+            if not provider_snapshot.usage:
+                continue
+
+            current_response = self._last_responses.get(provider_id)
+            if not current_response:
+                self._last_responses[provider_id] = provider_snapshot.usage
+                changed = True
+
+            if provider_id == self.dashboard_cache.primary_provider and not self._last_response:
+                self._last_response = provider_snapshot.usage
+                changed = True
+
+        return changed
+
+    def refresh_tray_from_cache_snapshot(self) -> None:
+        """在 UI 已收到 cache 数据但托盘尚未同步时刷新托盘。"""
+        if self._sync_tray_responses_from_cache():
+            self._render_tray()
+
     def _render_tray(self) -> None:
         """Re-render tray icon and tooltip from current state."""
+        self._sync_tray_responses_from_cache()
         data = self._icon_response()
         if 'error' in data:
             self.icon.icon = create_status_image('C!' if data.get('auth_error') else '!', self._light_taskbar)
@@ -348,8 +372,9 @@ class UsageMonitorForClaude:
             if result.data is not None:
                 self._last_responses[self.dashboard_cache.primary_provider] = result.data
                 provider_data_changed = True
+        snapshot_data_changed = self._sync_tray_responses_from_cache()
         if result.data is None:
-            if provider_data_changed:
+            if provider_data_changed or snapshot_data_changed:
                 self._render_tray()
             return
 
@@ -768,7 +793,7 @@ class UsageMonitorForClaude:
     # Lifecycle
 
     def _on_icon_ready(self, icon: Any) -> None:
-        """Called by pystray in a separate thread once the tray icon is set up."""
+        """Called by tray in a separate thread once the tray icon is set up."""
         try:
             icon.visible = True
             if getattr(sys, 'frozen', False):
@@ -788,4 +813,4 @@ class UsageMonitorForClaude:
 
 def crash_log(msg: str) -> None:
     """Show a crash message box (for windowless EXE builds)."""
-    ctypes.windll.user32.MessageBoxW(0, msg[:2000], 'Usage Monitor for Claude - Error', 0x10)
+    ctypes.windll.user32.MessageBoxW(0, msg[:2000], 'CCMonitor - Error', 0x10)

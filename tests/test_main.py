@@ -49,7 +49,7 @@ class TestPackageMainEntry(unittest.TestCase):
         fake_webview.start.side_effect = start_side_effect
 
         fake_app_module = types.ModuleType('src.runtime.app')
-        fake_app_module.UsageMonitorForClaude = MagicMock(return_value=app_instance)
+        fake_app_module.CCMonitor = MagicMock(return_value=app_instance)
         fake_app_module.crash_log = MagicMock()
 
         fake_single_instance = types.ModuleType('src.runtime.single_instance')
@@ -87,7 +87,7 @@ class TestPackageMainEntry(unittest.TestCase):
         fake_single_instance.ensure_single_instance.assert_called_once_with()
         fake_webview.create_window.assert_called_once_with('', html='', hidden=True)
         fake_webview.start.assert_called_once()
-        fake_app_module.UsageMonitorForClaude.assert_called_once_with()
+        fake_app_module.CCMonitor.assert_called_once_with()
 
 
 if __name__ == '__main__':

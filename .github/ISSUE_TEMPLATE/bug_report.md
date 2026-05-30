@@ -7,7 +7,7 @@ labels: ''
 <!-- Tip: If the app fails to start or behaves unexpectedly, running with
 --verbose prints system diagnostics that help identify the problem:
 
-  UsageMonitorForClaude.exe --verbose
+  CCMonitor.exe --verbose
 
 or from source:
 

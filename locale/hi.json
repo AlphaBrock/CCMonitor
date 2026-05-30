@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Claude उपयोग दिखाएं",
     "tooltip_title": "Claude उपयोग",
@@ -68,7 +68,7 @@
     "status_updated_s": "{s}s पहले अपडेट किया गया",
     "status_next_update": "अगला अपडेट {duration} में",
     "status_refreshing": "रीफ़्रेश हो रहा है...",
-    "already_running": "Usage Monitor for Claude v{running_version} पहले से चल रहा है।\n\nक्या आप चल रही प्रति को बदलना चाहते हैं?",
+    "already_running": "CCMonitor v{running_version} पहले से चल रहा है।\n\nक्या आप चल रही प्रति को बदलना चाहते हैं?",
     "pin_on": "पिन किया गया",
     "pin_off": "पिन हटाया गया",
     "menu_language": "भाषा",

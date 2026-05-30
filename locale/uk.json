@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Показати використання Claude",
     "tooltip_title": "Використання Claude",
@@ -68,7 +68,7 @@
     "status_updated_s": "Оновлено {s}с тому",
     "status_next_update": "Наступне оновлення через {duration}",
     "status_refreshing": "Оновлення...",
-    "already_running": "Usage Monitor for Claude v{running_version} вже запущено.\n\nБажаєте замінити запущений екземпляр?",
+    "already_running": "CCMonitor v{running_version} вже запущено.\n\nБажаєте замінити запущений екземпляр?",
     "pin_on": "Закріплено",
     "pin_off": "Не закріплено",
     "menu_language": "Мова",

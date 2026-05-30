@@ -196,18 +196,20 @@ body.open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: #ffffff;
-    font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
-    font-size: 18px;
     line-height: 1;
 }
 
-.provider-tab-icon-mask {
+.provider-icon-mask {
     background: currentColor;
     mask: var(--provider-icon-url) center / contain no-repeat;
     -webkit-mask: var(--provider-icon-url) center / contain no-repeat;
+}
+
+.provider-icon-empty {
+    display: none;
 }
 
 .provider-cards {
@@ -235,6 +237,19 @@ body.open {
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
+}
+
+.provider-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.provider-card-icon {
+    width: 18px;
+    height: 18px;
+    color: #ffffff;
+    flex: 0 0 auto;
 }
 
 h2 {

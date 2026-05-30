@@ -32,7 +32,7 @@ Prioritize readability and auditability - users handle credentials and must be a
 - Modular package architecture in `src/` with sub-packages (`integrations/`, `presentation/`, `runtime/`, `ui/`) - small focused modules are easier to audit than one large file
 - Security-critical code (credentials, API calls) isolated in `api.py` - the only module handling credentials
 - Pure data files (translations, config) stay separate - they contain no logic or credential access
-- Minimal, well-known dependencies only (e.g., requests, Pillow, pystray)
+- Minimal, well-known dependencies only (e.g., requests, pywebview)
 
 ## Type Hints & Documentation
 - Module docstring as very first element in file (title with equals underline, blank line, description)
@@ -114,7 +114,7 @@ Prioritize readability and auditability - users handle credentials and must be a
 ## Releasing
 - Update `__version__` in `src/__init__.py` and all four version fields in `packaging/version_info.py` (`filevers`, `prodvers`, `FileVersion`, `ProductVersion`)
 - In `CHANGELOG.md`: rename `## [Unreleased]` to `## [x.y.z] - YYYY-MM-DD`, add a fresh empty `## [Unreleased]` section above it, and update the compare links
-- GitHub release notes (`gh release create vX.Y.Z dist/UsageMonitorForClaude.exe --title "vX.Y.Z" --notes "..."`) must use the exact content from the version's `CHANGELOG.md` section (the `### Added` / `### Changed` / `### Fixed` / `### Removed` blocks), followed by a `[Full changelog](compare-url)` link and a `[README for this version](https://github.com/jens-duttke/usage-monitor-for-claude/blob/vX.Y.Z/README.md)` link
+- GitHub release notes (`gh release create X.Y.Z dist/CCMonitor.exe --title "X.Y.Z" --notes "..."`) must use the exact content from the version's `CHANGELOG.md` section (the `### Added` / `### Changed` / `### Fixed` / `### Removed` blocks), followed by a `[Full changelog](compare-url)` link and a `[README for this version](https://github.com/AlphaBrock/CCMonitor/blob/X.Y.Z/README.md)` link
 
 ## Testing
 - After completing all changes, run the full test suite (`python -m unittest discover -s tests`) and ensure all tests pass - this applies to any change (code, locale files, config, data files), not just Python modules

@@ -1,5 +1,5 @@
 {
-    "popup_title": "Usage Monitor for Claude",
+    "popup_title": "CCMonitor",
     "dashboard_title": "Usage Monitor",
     "menu_show": "Show Claude Usage",
     "tooltip_title": "Claude Usage",
@@ -68,7 +68,7 @@
     "status_updated_s": "Updated {s}s ago",
     "status_next_update": "Next update in {duration}",
     "status_refreshing": "Refreshing...",
-    "already_running": "Usage Monitor for Claude v{running_version} is already running.\n\nDo you want to replace the running instance?",
+    "already_running": "CCMonitor v{running_version} is already running.\n\nDo you want to replace the running instance?",
     "pin_on": "Pinned in place",
     "pin_off": "Always on top disabled",
     "menu_language": "Language",

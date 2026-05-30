@@ -319,8 +319,8 @@ class TestCheckLatestVersion(unittest.TestCase):
                 'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.16.0',
                 'assets': [
                     {
-                        'name': 'UsageMonitorForClaude.exe',
-                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/UsageMonitorForClaude.exe',
+                        'name': 'CCMonitor.exe',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/CCMonitor.exe',
                     },
                     {
                         'name': 'checksums.txt',
@@ -334,7 +334,7 @@ class TestCheckLatestVersion(unittest.TestCase):
 
         self.assertTrue(result.available)
         self.assertEqual(result.version, '1.16.0')
-        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/UsageMonitorForClaude.exe')
+        self.assertEqual(result.url, 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.16.0/CCMonitor.exe')
         mock_get.assert_called_once_with(
             claude_cli.RELEASES_API_URL,
             headers=claude_cli.RELEASE_API_HEADERS,
@@ -409,8 +409,8 @@ class TestCheckLatestVersion(unittest.TestCase):
                 'html_url': 'https://github.com/AlphaBrock/CCMonitor/releases/tag/v1.15.5',
                 'assets': [
                     {
-                        'name': 'UsageMonitorForClaude.exe',
-                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.15.5/UsageMonitorForClaude.exe',
+                        'name': 'CCMonitor.exe',
+                        'browser_download_url': 'https://github.com/AlphaBrock/CCMonitor/releases/download/v1.15.5/CCMonitor.exe',
                     },
                 ],
             }),
