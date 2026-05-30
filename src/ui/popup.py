@@ -37,6 +37,8 @@ _CHECK_MS = 1000
 _VISIBLE_USAGE_FIELDS = ('five_hour', 'seven_day')
 _PROVIDER_ORDER = ('codex', 'claude')
 _PROVIDER_TITLES = {'codex': 'Codex', 'claude': 'Claude'}
+_VALID_PROVIDER_VIEWS = frozenset({'all', 'codex', 'claude'})
+_TRAY_PROVIDER_TO_VIEW = {'auto': 'all', 'codex': 'codex', 'claude': 'claude'}
 _GWL_EXSTYLE = -20
 _WS_EX_APPWINDOW = 0x00040000
 _WS_EX_TOOLWINDOW = 0x00000080
@@ -117,6 +119,16 @@ def usage_entries(usage: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     return entries
 
 
+def _normalize_provider_view(view_id: str | None) -> str:
+    if view_id in _VALID_PROVIDER_VIEWS:
+        return str(view_id)
+    return 'all'
+
+
+def _provider_view_from_tray(tray_provider: str | None) -> str:
+    return _TRAY_PROVIDER_TO_VIEW.get(str(tray_provider or ''), 'all')
+
+
 def _status_dict(snap: CacheSnapshot, next_poll_time: float | None) -> dict[str, Any]:
     """Convert cache state into a status dict consumable by the frontend."""
     if not snap.usage:
@@ -146,14 +158,33 @@ def _usage_row(field: str, entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def snapshot_to_dict(snap: CacheSnapshot | DashboardSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+def _session_usage_row(usage: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not usage:
+        return None
+
+    entry = usage.get('five_hour')
+    if not isinstance(entry, dict) or entry.get('utilization') is None:
+        return None
+
+    return _usage_row('five_hour', entry)
+
+
+def snapshot_to_dict(
+    snap: CacheSnapshot | DashboardSnapshot,
+    next_poll_time: float | None = None,
+    provider_view: str | None = None,
+) -> dict[str, Any]:
     """Convert a cache snapshot into data for frontend init and incremental updates."""
     if hasattr(snap, 'providers'):
-        return _dashboard_to_dict(snap, next_poll_time=next_poll_time)  # type: ignore[arg-type]
-    return _single_snapshot_to_dict(snap, next_poll_time=next_poll_time)
+        return _dashboard_to_dict(snap, next_poll_time=next_poll_time, provider_view=provider_view)  # type: ignore[arg-type]
+    return _single_snapshot_to_dict(snap, next_poll_time=next_poll_time, provider_view=provider_view)
 
 
-def _dashboard_to_dict(snap: DashboardSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+def _dashboard_to_dict(
+    snap: DashboardSnapshot,
+    next_poll_time: float | None = None,
+    provider_view: str | None = None,
+) -> dict[str, Any]:
     """Convert a dashboard snapshot into frontend data."""
     providers: list[dict[str, Any]] = []
     for provider_id in _PROVIDER_ORDER:
@@ -165,15 +196,21 @@ def _dashboard_to_dict(snap: DashboardSnapshot, next_poll_time: float | None = N
     return {
         'providers': providers,
         'primary_provider': snap.primary_provider,
+        'provider_view': _normalize_provider_view(provider_view),
     }
 
 
-def _single_snapshot_to_dict(snap: CacheSnapshot, next_poll_time: float | None = None) -> dict[str, Any]:
+def _single_snapshot_to_dict(
+    snap: CacheSnapshot,
+    next_poll_time: float | None = None,
+    provider_view: str | None = None,
+) -> dict[str, Any]:
     """Convert a single-provider snapshot into frontend data."""
     provider_id = getattr(snap, 'provider_id', 'claude')
     return {
         'providers': [_provider_to_dict(provider_id, snap, next_poll_time=next_poll_time)],
         'primary_provider': provider_id,
+        'provider_view': _normalize_provider_view(provider_view),
     }
 
 
@@ -216,6 +253,7 @@ def _provider_to_dict(provider_id: str, snap: CacheSnapshot, next_poll_time: flo
         'title': _PROVIDER_TITLES.get(provider_id, provider_id.title()),
         'icon': '',
         'profile': profile,
+        'session_usage': _session_usage_row(snap.usage),
         'usage': usage_rows,
         'extra': extra,
         'metrics': _local_metrics(provider_id),
@@ -262,7 +300,13 @@ def _format_tokens(value: int | None) -> str:
     return str(value)
 
 
-def init_config(snap: CacheSnapshot | DashboardSnapshot, *, pinned: bool, next_poll_time: float | None = None) -> dict[str, Any]:
+def init_config(
+    snap: CacheSnapshot | DashboardSnapshot,
+    *,
+    pinned: bool,
+    next_poll_time: float | None = None,
+    provider_view: str | None = None,
+) -> dict[str, Any]:
     """Build the frontend initialization config dict."""
     return {
         'colors': {
@@ -286,6 +330,9 @@ def init_config(snap: CacheSnapshot | DashboardSnapshot, *, pinned: bool, next_p
             'usage': T['usage'],
             'extra_usage': T['extra_usage'],
             'local_metrics': T['local_metrics'],
+            'view_brief': T['view_brief'],
+            'view_details': T['view_details'],
+            'session_unavailable': T['session_unavailable'],
             'status_updated_s': T['status_updated_s'],
             'status_updated': T['status_updated'],
             'status_next_update': T['status_next_update'],
@@ -298,7 +345,7 @@ def init_config(snap: CacheSnapshot | DashboardSnapshot, *, pinned: bool, next_p
         },
         'app_version': __version__,
         'window': {'pinned': pinned},
-        'data': snapshot_to_dict(snap, next_poll_time=next_poll_time),
+        'data': snapshot_to_dict(snap, next_poll_time=next_poll_time, provider_view=provider_view),
     }
 
 
@@ -316,6 +363,9 @@ class _PopupApi:
 
     def report_height(self, height: int) -> None:
         self._popup.report_height(height)
+
+    def set_provider_view(self, view_id: str) -> str:
+        return self._popup.set_provider_view(view_id)
 
 
 class UsagePopup:
@@ -416,9 +466,29 @@ class UsagePopup:
         if not self._layout_ready:
             self._reveal_after_layout()
 
+    def set_provider_view(self, view_id: str) -> str:
+        setter = getattr(self.app, 'set_tray_provider_from_view', None)
+        if callable(setter):
+            return setter(view_id)
+        return self._provider_view()
+
+    def sync_provider_view(self) -> None:
+        if not self._running or not self._layout_ready:
+            return
+
+        try:
+            self._window.evaluate_js(f'syncProviderView({json.dumps(self._provider_view())})')
+        except Exception:
+            return
+
     def _on_loaded(self) -> None:
         """Inject init data after page load and start the incremental update loop."""
-        config = init_config(self._current_snapshot(), pinned=self._pinned, next_poll_time=self.app._next_poll_time)
+        config = init_config(
+            self._current_snapshot(),
+            pinned=self._pinned,
+            next_poll_time=self.app._next_poll_time,
+            provider_view=self._provider_view(),
+        )
         self._window.evaluate_js(f'init({json.dumps(config)})')
         self._refresh_tray_from_cache_snapshot()
 
@@ -469,7 +539,7 @@ class UsagePopup:
 
                 self._last_version = snap.version
                 self._last_next_poll_time = next_poll_time
-                payload = snapshot_to_dict(snap, next_poll_time=next_poll_time)
+                payload = snapshot_to_dict(snap, next_poll_time=next_poll_time, provider_view=self._provider_view())
                 self._window.evaluate_js(f'updateData({json.dumps(payload)})')
                 self._refresh_tray_from_cache_snapshot()
             except Exception:
@@ -481,6 +551,12 @@ class UsagePopup:
         if dashboard_cache is not None:
             return dashboard_cache.snapshot
         return self.app.cache.snapshot
+
+    def _provider_view(self) -> str:
+        provider_view = getattr(self.app, 'provider_view', None)
+        if isinstance(provider_view, str):
+            return _normalize_provider_view(provider_view)
+        return _provider_view_from_tray(getattr(self.app, '_tray_provider', None))
 
     def _refresh_tray_from_cache_snapshot(self) -> None:
         """让托盘复用已经展示到窗口里的 cache 数据。"""

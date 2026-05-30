@@ -159,6 +159,28 @@ class TestSnapshotToDict(unittest.TestCase):
         self.assertEqual([row['field'] for row in provider['usage']], ['five_hour', 'seven_day'])
         self.assertNotIn('installations', provider)
 
+    def test_session_usage_is_five_hour_only(self):
+        usage = {
+            'five_hour': {'utilization': 17, 'resets_at': '2026-01-01T05:00:00Z'},
+            'seven_day': {'utilization': 88, 'resets_at': '2026-01-07T00:00:00Z'},
+        }
+
+        result = snapshot_to_dict(_snap(usage=usage))
+        provider = _first_provider(result)
+
+        self.assertEqual(provider['session_usage']['field'], 'five_hour')
+        self.assertEqual(provider['session_usage']['pct_text'], '17%')
+
+    def test_session_usage_missing_five_hour_is_none(self):
+        usage = {
+            'five_hour': None,
+            'seven_day': {'utilization': 88, 'resets_at': '2026-01-07T00:00:00Z'},
+        }
+
+        result = snapshot_to_dict(_snap(usage=usage))
+
+        self.assertIsNone(_first_provider(result)['session_usage'])
+
     def test_usage_row_contains_text_bar_and_tone(self):
         usage = {'five_hour': {'utilization': 84, 'resets_at': '2027-01-01T05:00:00+00:00'}}
 
@@ -227,6 +249,10 @@ class TestSnapshotToDict(unittest.TestCase):
         self.assertEqual(result['providers'][0]['title'], 'Codex')
         self.assertEqual(result['providers'][1]['title'], 'Claude')
 
+    def test_provider_view_is_normalized(self):
+        self.assertEqual(snapshot_to_dict(_snap(), provider_view='codex')['provider_view'], 'codex')
+        self.assertEqual(snapshot_to_dict(_snap(), provider_view='unknown')['provider_view'], 'all')
+
     def test_local_metrics_are_included(self):
         result = snapshot_to_dict(_snap())
         metrics = _first_provider(result)['metrics']
@@ -256,11 +282,15 @@ class TestInitConfig(unittest.TestCase):
         self.assertIn('bar_fg_danger', config['colors'])
         self.assertNotIn('claude_code', config['t'])
         self.assertEqual(config['t']['title'], T['dashboard_title'])
+        self.assertEqual(config['t']['view_brief'], T['view_brief'])
+        self.assertEqual(config['t']['view_details'], T['view_details'])
+        self.assertEqual(config['t']['session_unavailable'], T['session_unavailable'])
         self.assertIn('providers', config['data'])
+        self.assertEqual(config['data']['provider_view'], 'all')
 
 
 class TestPopupStaticAssets(unittest.TestCase):
-    def test_provider_tabs_reference_packaged_svg_assets(self):
+    def test_provider_views_reference_packaged_svg_assets(self):
         script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
         popup_py = (ROOT / 'src' / 'ui' / 'popup.py').read_text(encoding='utf-8')
 
@@ -280,12 +310,81 @@ class TestPopupStaticAssets(unittest.TestCase):
         stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
 
         self.assertIn('.provider-tab-icon', stylesheet)
+        self.assertIn('.summary-provider-icon', stylesheet)
         self.assertIn('.provider-card-icon', stylesheet)
         self.assertIn('width: 18px', stylesheet)
         self.assertIn('height: 18px', stylesheet)
         self.assertIn('color: #ffffff', stylesheet)
         self.assertIn('.provider-icon-mask', stylesheet)
         self.assertIn('mask: var(--provider-icon-url) center / contain no-repeat', stylesheet)
+
+    def test_brief_mode_frontend_defaults_and_uses_session_usage(self):
+        script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+        html = (ROOT / 'src' / 'ui' / 'popup' / 'popup.html').read_text(encoding='utf-8')
+        brief_start = script.index('function createSummaryProviderRow')
+        details_start = script.index('function createProviderIcon')
+        brief_body = script[brief_start:details_start]
+
+        self.assertIn("let activeMode = 'brief';", script)
+        self.assertIn('detailsBtn', script)
+        self.assertNotIn('usage-summary-card', script)
+        self.assertIn('provider.session_usage', brief_body)
+        self.assertIn('summary-provider-status', brief_body)
+        self.assertIn('createProviderAccountRow(provider)', brief_body)
+        self.assertNotIn('provider.extra', brief_body)
+        self.assertNotIn('provider.metrics', brief_body)
+        self.assertIn('id="detailsBtn"', html)
+        self.assertNotIn('providerSwitcher', html)
+        self.assertNotIn('modeSwitcher', html)
+        self.assertNotIn('renderModeSwitcher', script)
+
+    def test_details_view_restores_provider_switcher_and_tray_sync(self):
+        script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+        html = (ROOT / 'src' / 'ui' / 'popup' / 'popup.html').read_text(encoding='utf-8')
+
+        self.assertIn('createDetailsSwitcher', script)
+        self.assertIn('createSwitcherButton', script)
+        self.assertIn('provider-tab', script)
+        self.assertIn('set_provider_view', script)
+        self.assertNotIn('id="providerSwitcher"', html)
+
+    def test_details_account_and_plan_share_one_row(self):
+        script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+        stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
+
+        self.assertIn('function createProviderAccountRow', script)
+        self.assertIn('provider-account-row', script)
+        self.assertIn('provider-account-email', script)
+        self.assertIn('provider-account-plan', script)
+        self.assertNotIn('provider-email', script)
+        self.assertNotIn("plan.className = 'provider-plan'", script)
+        self.assertIn('.provider-account-row', stylesheet)
+        self.assertIn('justify-content: space-between', stylesheet)
+
+    def test_status_is_rendered_in_provider_context(self):
+        script = (ROOT / 'src' / 'ui' / 'popup' / 'popup.js').read_text(encoding='utf-8')
+        html = (ROOT / 'src' / 'ui' / 'popup' / 'popup.html').read_text(encoding='utf-8')
+        stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
+
+        self.assertIn('footerStatus', script)
+        self.assertIn('formatProviderStatus', script)
+        self.assertIn('id="footerStatus"', html)
+        self.assertIn('data-provider-status', script)
+        self.assertIn('provider-status', script)
+        self.assertIn('summary-provider-status', script)
+        self.assertNotIn('provider-title-wrap', script)
+        self.assertIn('.provider-status', stylesheet)
+        self.assertIn('text-align: right', stylesheet)
+        self.assertIn('text-overflow: ellipsis', stylesheet)
+
+    def test_header_title_height_and_content_spacing_are_compact(self):
+        stylesheet = (ROOT / 'src' / 'ui' / 'popup' / 'popup.css').read_text(encoding='utf-8')
+
+        self.assertIn('padding: 8px 12px 4px', stylesheet)
+        self.assertIn('min-height: 28px', stylesheet)
+        self.assertIn('font-size: 16px', stylesheet)
+        self.assertIn('line-height: 28px', stylesheet)
+        self.assertIn('padding: 4px 18px 12px', stylesheet)
 
     def test_pyinstaller_spec_includes_svg_icons(self):
         spec = (ROOT / 'packaging' / 'ccmonitor.spec').read_text(encoding='utf-8')

@@ -13,9 +13,9 @@ CCMonitor 是一款原生 Windows 托盘应用，让您一目了然地掌握 Cla
 ## 功能特性
 
 - **免安装** - 单个 EXE 文件（约 9.8 MB），无需安装、无 Electron、无额外运行时依赖。下载后放在任意位置即可运行，卸载只需删除文件
-- **零配置** - 默认以现有 Claude Code 登录作为托盘和提醒的主数据源；如本机已登录 Codex，详情窗口会同时显示 Codex 用量，用量查询无需 API 密钥
+- **零配置** - 默认以现有 Claude Code 登录作为托盘和提醒的主数据源；如本机已登录 Codex，桌面面板会同时显示 Codex 用量，用量查询无需 API 密钥
 - **实时托盘图标** 带两个[可配置](docs/configuration.md#tray-icon-bars)进度条（默认显示会话和周用量），[可配置工具提示](docs/configuration.md#tooltip-fields)、百分比显示，可通过右键菜单选择托盘显示哪个 provider 的指标（Auto 悬停提示同时显示 Codex 和 Claude，图标进度条仍使用主 provider），以及适配浅色和深色任务栏的主题感知颜色
-- **桌面详情窗口** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。窗口提供 All / Codex / Claude 视图，同时显示两边的 `5h` / `7d` 配额、本地 30 天成本与 Token 估算、重置倒计时以及数据过时指示器
+- **桌面面板** - 启动时可见显示，保持打开直到隐藏，支持左键拖拽定位，可置顶固定。默认直接在主面板显示当前 provider 选择下的 `5h` 用量，点击信息按钮后查看 `5h` / `7d` 配额、本地 30 天成本与 Token 估算、重置倒计时以及数据过时指示器
 - **智能提醒** - 按配额类型可配置阈值通知，时间感知模式仅在使用超过已过时间比例时才提醒。接近耗尽的配额刷新后发送重置通知
 - **[事件命令](docs/event-commands.md)** - 在配额重置、使用达到阈值或应用启动时运行自定义 Shell 命令。可发送手机推送通知、恢复 AI 代理、自动开始新的 5 小时会话、播放提示音或触发任何自定义工作流
 - **自动令牌刷新** - Claude 模式在 OAuth 会话过期时后台运行 `claude update`；Codex 模式直接刷新本地 ChatGPT OAuth 令牌
@@ -43,7 +43,7 @@ CCMonitor 是一款原生 Windows 托盘应用，让您一目了然地掌握 Cla
 
 - **Windows 10 或 Windows 11**（64 位）
 - **Claude 数据**：已安装并登录 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（CLI、VS Code 扩展或 JetBrains 插件均可）。应用读取 Claude Code 本地存储的 OAuth 令牌（`~/.claude/.credentials.json`）。如果设置了 `CLAUDE_CONFIG_DIR`，应用使用该目录。
-- **Codex 数据**：应用读取 `%CODEX_HOME%\auth.json` 或 `~\.codex\auth.json` 中的 ChatGPT/Codex OAuth 令牌。`OPENAI_API_KEY` 不能用于查询 Codex 用量。`usage_provider` 决定提醒、事件命令和 Auto 图标进度条使用哪个 provider 作为主数据源，`tray_provider` 可单独控制托盘显示。
+- **Codex 数据**：应用读取 `%CODEX_HOME%\auth.json` 或 `~\.codex\auth.json` 中的 ChatGPT/Codex OAuth 令牌。`OPENAI_API_KEY` 不能用于查询 Codex 用量。`usage_provider` 决定提醒、事件命令和 Auto 图标进度条使用哪个 provider 作为主数据源，`tray_provider` 控制托盘显示和桌面面板 provider 过滤。
 
 > [!TIP]
 > Claude 令牌过期时，应用会自动运行 `claude update`；Codex 令牌超过 8 天会直接刷新 OAuth token。如果令牌完全缺失，应用会显示通知和 "!" 图标 - 登录对应工具后监控器会自动检测到。
@@ -61,9 +61,9 @@ CCMonitor 是一款原生 Windows 托盘应用，让您一目了然地掌握 Cla
 | 操作 | 说明 |
 |---|---|
 | **悬停**在托盘图标上 | 工具提示显示 5h 和 7d 用量百分比及重置时间 |
-| **应用启动** | 桌面详情窗口立即在托盘附近打开 |
-| **左键点击**托盘图标 | 显示桌面详情窗口并置顶 |
-| **All / Codex / Claude** | 在双 provider 汇总和单独 provider 视图之间切换 |
+| **应用启动** | 桌面面板立即在托盘附近打开，默认显示单卡片 5h 用量 |
+| **左键点击**托盘图标 | 显示桌面面板并置顶 |
+| **信息按钮** | 在主面板 `5h` 简略视图和完整详情面板之间切换；详情面板顶部 provider 图标会同步托盘 Provider 设置 |
 | **右键点击**托盘图标 | 右键菜单：显示窗口、Provider 显示选择、开机启动、语言切换、检查更新、测试事件命令、重新启动、GitHub 链接、退出 |
 | **PIN** 按钮 | 保持桌面窗口始终置顶 |
 | **X** 按钮或 **Escape** | 隐藏桌面窗口到托盘 |

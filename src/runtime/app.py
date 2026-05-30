@@ -37,6 +37,10 @@ from src.ui.tray_icon import create_icon_image, create_status_image, taskbar_use
 
 __all__ = ['CCMonitor', 'crash_log']
 
+_VALID_TRAY_PROVIDERS = frozenset({'auto', 'claude', 'codex'})
+_TRAY_PROVIDER_TO_VIEW = {'auto': 'all', 'claude': 'claude', 'codex': 'codex'}
+_PROVIDER_VIEW_TO_TRAY = {'all': 'auto', 'claude': 'claude', 'codex': 'codex'}
+
 
 def _future_iso(**kwargs: float) -> str:
     """Return an ISO 8601 timestamp offset from now by the given timedelta kwargs."""
@@ -135,6 +139,10 @@ class CCMonitor:
             ),
         )
 
+    @property
+    def provider_view(self) -> str:
+        return _TRAY_PROVIDER_TO_VIEW.get(getattr(self, '_tray_provider', 'auto'), 'all')
+
     # Menu actions
 
     def on_show_popup(self, icon: Any = None, item: Any = None) -> None:
@@ -200,14 +208,34 @@ class CCMonitor:
     def _make_provider_handler(self, provider: str):
         """Return a menu click handler that switches the tray display provider.
 
-        Applied live (no restart): only the tray icon and tooltip change.
-        Alerts and event commands keep using the configured primary provider.
+        Applied live (no restart): tray display and popup provider filtering
+        change together. Alerts and event commands keep using the configured
+        primary provider.
         """
         def handler(icon: Any = None, item: Any = None) -> None:
-            self._tray_provider = provider
-            save_tray_provider(provider)
-            self._render_tray()
+            self.set_tray_provider(provider)
         return handler
+
+    def set_tray_provider(self, provider: str) -> str:
+        if provider not in _VALID_TRAY_PROVIDERS:
+            return self._tray_provider
+
+        self._tray_provider = provider
+        save_tray_provider(provider)
+        self._render_tray()
+        popup = getattr(self, 'popup', None)
+        if popup is not None:
+            popup.sync_provider_view()
+
+        return self._tray_provider
+
+    def set_tray_provider_from_view(self, view_id: str) -> str:
+        provider = _PROVIDER_VIEW_TO_TRAY.get(view_id)
+        if provider is None:
+            return self.provider_view
+
+        self.set_tray_provider(provider)
+        return self.provider_view
 
     def on_test_reset_5h(self, icon: Any = None, item: Any = None) -> None:
         run_event_command(ON_RESET_COMMAND, {

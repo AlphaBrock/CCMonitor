@@ -6,35 +6,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.16.2] - 2026-05-30
 
 ### Changed
 
 - Legacy app branding has been replaced with CCMonitor across current app text, package metadata, docs, and tests.
+- The desktop panel now opens as a simplified single-card 5h view, with the full dashboard behind an info button.
+- Tray Provider selection now controls which providers appear in the simplified desktop panel, and the Details provider icons sync back to the same setting.
+- Details cards now right-align update status next to each provider title, while the simplified panel shows update status on the right and account/plan metadata below.
 - Windows package-size trimming now excludes unused legacy WebView, Android/ARM/x86 WebView, and 32-bit runtime files from the current native-tray build.
 - The current single-file EXE is about 9.8 MB and remains free of Pillow and pystray.
-
-### Fixed
-
-- `scripts/build.py` now checks the same `CCMonitor.exe` file name that PyInstaller produces, so successful builds no longer end with "EXE not found."
-- Packaged EXE startup no longer fails after package-size trimming because pywebview runtime architecture directories are preserved without bundling unused non-x64 loader DLLs.
-- Tray hover tooltip now refreshes from cached provider data when the desktop panel already has usage values.
-- Provider icons in the desktop panel now use the packaged white SVG assets instead of pixel-style text glyphs.
 
 ---
 
 ### 变更
 
 - 当前应用文案、打包元数据、文档和测试中的旧应用品牌已统一替换为 CCMonitor。
+- 桌面面板现在默认打开单卡片 5h 简略视图，完整面板改由信息按钮进入。
+- 托盘 Provider 选择现在会控制简略桌面面板中显示哪些 provider，详情面板顶部 provider 图标也会同步同一设置。
+- 详情卡片中的更新时间现在右对齐显示在 provider 标题同一行，简略面板则在右侧显示更新时间，并将账号和套餐下移为元信息行。
 - Windows 打包体积继续裁剪，当前原生托盘构建会排除未使用的旧版 WebView、Android/ARM/x86 WebView 和 32 位运行库文件。
 - 当前单文件 EXE 约 9.8 MB，并继续保持不依赖 Pillow 和 pystray。
-
-### 修复
-
-- `scripts/build.py` 现在检查与 PyInstaller 一致的 `CCMonitor.exe` 文件名，成功打包后不再误报 "EXE not found"。
-- 修复打包体积裁剪后的 EXE 启动失败问题：现在会保留 pywebview 需要检查的运行时架构目录，但不打包未使用的非 x64 loader DLL。
-- 当桌面面板已经有用量数据时，托盘悬停提示现在会从缓存的 provider 数据同步刷新。
-- 桌面面板中的 provider 图标现在使用打包的白色 SVG 资源，不再回退到像素风字符图标。
 
 ## [1.16.0] - 2026-05-29
 

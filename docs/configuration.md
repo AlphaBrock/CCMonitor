@@ -41,13 +41,13 @@ Codex uses direct OAuth only. `OPENAI_API_KEY` cannot query ChatGPT/Codex usage 
 
 ## Tray provider
 
-Choose which provider appears in the tray icon and hover tooltip. This is separate from `usage_provider`, which remains the primary provider for alerts and automation.
+Choose which provider appears in the tray icon, hover tooltip, and desktop panel provider filter. This is separate from `usage_provider`, which remains the primary provider for alerts and automation.
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `tray_provider` | `"auto"` | Tray display selector. Valid values: `"auto"`, `"claude"`, or `"codex"` |
+| `tray_provider` | `"auto"` | Tray and desktop panel provider selector. Valid values: `"auto"`, `"claude"`, or `"codex"` |
 
-In `"auto"` mode, the tray hover tooltip shows Codex and Claude in that order. The tray icon still uses the primary `usage_provider` for its two progress bars because a two-bar icon cannot clearly show both providers' session and weekly quotas at the same time.
+In `"auto"` mode, the tray hover tooltip shows Codex and Claude in that order, and the desktop panel shows both providers. The tray icon still uses the primary `usage_provider` for its two progress bars because a two-bar icon cannot clearly show both providers' session and weekly quotas at the same time. Changing the Provider submenu or the provider icons in the desktop panel Details view writes this setting and immediately updates any open desktop panel.
 
 ```json
 {

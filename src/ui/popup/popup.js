@@ -4,10 +4,11 @@ let statusStateByProvider = {};
 let textTimerId = null;
 let pinRequestPending = false;
 let activeView = 'all';
+let activeMode = 'brief';
 let lastData = { providers: [] };
 const BAR_LENGTH = 20;
 
-const TAB_ICON_ASSETS = {
+const PROVIDER_ICON_ASSETS = {
     all: { path: '../../../assets/icon/application.svg', mode: 'mask' },
     codex: { path: '../../../assets/icon/openai.svg', mode: 'mask' },
     claude: { path: '../../../assets/icon/claude-color.svg', mode: 'mask' },
@@ -19,20 +20,22 @@ function init(config) {
         styles.setProperty(`--${key.replaceAll('_', '-')}`, value);
     }
 
-    translations = config.t;
+    translations = config.t || {};
     document.getElementById('title').textContent = translations.title;
     document.getElementById('appVersion').textContent = config.app_version;
 
     els = {
         header: document.getElementById('windowHeader'),
-        switcher: document.getElementById('providerSwitcher'),
         cards: document.getElementById('providerCards'),
+        footerStatus: document.getElementById('footerStatus'),
         pinBtn: document.getElementById('pinBtn'),
+        detailsBtn: document.getElementById('detailsBtn'),
         closeBtn: document.getElementById('closeBtn'),
     };
 
     bindWindowActions();
     setPinned(Boolean(config.window?.pinned));
+    setDetailsMode(false, false);
     updateData(config.data);
 
     requestAnimationFrame(() => {
@@ -45,8 +48,8 @@ function bindWindowActions() {
     const stopDrag = (event) => event.stopPropagation();
 
     els.pinBtn.addEventListener('mousedown', stopDrag);
+    els.detailsBtn.addEventListener('mousedown', stopDrag);
     els.closeBtn.addEventListener('mousedown', stopDrag);
-    els.switcher.addEventListener('mousedown', stopDrag);
 
     els.pinBtn.addEventListener('click', async () => {
         if (pinRequestPending) {
@@ -69,6 +72,10 @@ function bindWindowActions() {
         }
     });
 
+    els.detailsBtn.addEventListener('click', () => {
+        setDetailsMode(activeMode !== 'details');
+    });
+
     els.closeBtn.addEventListener('click', () => {
         window.pywebview?.api?.hide_window?.();
     });
@@ -88,39 +95,134 @@ function setPinned(pinned) {
     els.header.classList.toggle('pywebview-drag-region', !pinned);
 }
 
+function setDetailsMode(showDetails, shouldRender = true) {
+    activeMode = showDetails ? 'details' : 'brief';
+    els.detailsBtn.classList.toggle('active', showDetails);
+    els.detailsBtn.setAttribute('aria-pressed', showDetails ? 'true' : 'false');
+    els.detailsBtn.dataset.tooltip = showDetails ? (translations.view_brief || 'Brief') : (translations.view_details || 'Details');
+
+    if (shouldRender) {
+        renderProviders(lastData.providers || []);
+        tickStatusText();
+    }
+}
+
 function updateData(data) {
     lastData = data || { providers: [] };
-    const providers = lastData.providers || [];
-    if (activeView !== 'all' && !providers.some((provider) => provider.id === activeView)) {
-        activeView = 'all';
+    if (lastData.provider_view) {
+        activeView = normalizeProviderView(lastData.provider_view);
     }
 
-    renderSwitcher(providers);
-    renderProviders(providers);
+    renderProviders(lastData.providers || []);
     startStatusTimer();
 }
 
-function renderSwitcher(providers) {
+function normalizeProviderView(viewId) {
+    return ['all', 'codex', 'claude'].includes(viewId) ? viewId : 'all';
+}
+
+function syncProviderView(viewId) {
+    activeView = normalizeProviderView(viewId);
+    renderProviders(lastData.providers || []);
+    tickStatusText();
+}
+
+function visibleProviders(providers) {
+    if (activeView === 'all') {
+        return providers;
+    }
+    return providers.filter((provider) => provider.id === activeView);
+}
+
+function renderProviders(providers) {
+    statusStateByProvider = {};
+    const visible = visibleProviders(providers);
+
+    if (activeMode === 'details') {
+        els.cards.replaceChildren(createDetailsSwitcher(providers), ...visible.map(createProviderCard));
+    } else {
+        els.cards.replaceChildren(...createSummaryNodes(visible));
+    }
+
+    requestAnimationFrame(fitTextBars);
+}
+
+function createSummaryNodes(providers) {
+    const head = document.createElement('div');
+    head.className = 'summary-card-head';
+    const title = document.createElement('h2');
+    const sessionProvider = providers.find((provider) => provider.session_usage);
+    title.textContent = sessionProvider?.session_usage?.label || 'Session (5h)';
+    const scope = document.createElement('span');
+    scope.className = 'summary-scope';
+    scope.textContent = providers.length ? providers.map((provider) => provider.title).join(' + ') : translations.status_refreshing;
+    head.append(title, scope);
+
+    const rows = document.createElement('div');
+    rows.className = 'summary-provider-list';
+    if (providers.length) {
+        rows.replaceChildren(...providers.map(createSummaryProviderRow));
+    } else {
+        const empty = document.createElement('div');
+        empty.className = 'brief-empty';
+        empty.textContent = translations.session_unavailable || 'Session unavailable';
+        rows.append(empty);
+    }
+
+    return [head, rows];
+}
+
+function createSummaryProviderRow(provider) {
+    const row = document.createElement('div');
+    row.className = `summary-provider-row provider-${provider.id}`;
+    row.dataset.provider = provider.id;
+
+    const head = document.createElement('div');
+    head.className = 'summary-provider-head';
+
+    const identity = document.createElement('div');
+    identity.className = 'summary-provider-title';
+    const icon = createProviderIcon(provider.id, provider.icon, 'summary-provider-icon');
+    const name = document.createElement('span');
+    name.textContent = provider.title;
+    identity.append(icon, name);
+
+    const status = document.createElement('span');
+    status.className = 'summary-provider-status';
+    status.dataset.providerStatus = provider.id;
+    head.append(identity, status);
+    row.append(head);
+
+    const accountRow = createProviderAccountRow(provider);
+    if (accountRow) {
+        accountRow.classList.add('summary-account-row');
+        row.append(accountRow);
+    }
+
+    if (provider.session_usage) {
+        row.append(createUsageRow(provider.session_usage, { compact: true }));
+    } else {
+        const empty = document.createElement('div');
+        empty.className = 'brief-empty';
+        empty.textContent = translations.session_unavailable || 'Session unavailable';
+        row.append(empty);
+    }
+
+    setProviderStatusState(provider.id, provider.status);
+    return row;
+}
+
+function createDetailsSwitcher(providers) {
+    const switcher = document.createElement('nav');
+    switcher.className = 'provider-switcher';
+    switcher.setAttribute('aria-label', 'Provider view');
+
     const buttons = [createSwitcherButton('all', translations.all || 'All', '')];
     for (const provider of providers) {
         buttons.push(createSwitcherButton(provider.id, provider.title, provider.icon));
     }
-    els.switcher.replaceChildren(...buttons);
-}
-
-function createProviderIcon(viewId, fallbackText, className) {
-    const icon = document.createElement('span');
-    icon.className = className;
-    const asset = TAB_ICON_ASSETS[viewId];
-    if (asset?.mode === 'mask') {
-        icon.classList.add('provider-icon-mask');
-        icon.style.setProperty('--provider-icon-url', `url("${asset.path}")`);
-    } else if (fallbackText) {
-        icon.textContent = fallbackText;
-    } else {
-        icon.classList.add('provider-icon-empty');
-    }
-    return icon;
+    switcher.replaceChildren(...buttons);
+    return switcher;
 }
 
 function createSwitcherButton(viewId, labelText, iconText) {
@@ -135,19 +237,81 @@ function createSwitcherButton(viewId, labelText, iconText) {
     label.textContent = labelText;
 
     button.append(icon, label);
-    button.addEventListener('click', () => {
-        activeView = viewId;
-        updateData(lastData);
-    });
+    button.addEventListener('click', () => selectProviderView(viewId));
     return button;
 }
 
-function renderProviders(providers) {
-    const visibleProviders = activeView === 'all'
-        ? providers
-        : providers.filter((provider) => provider.id === activeView);
-    els.cards.replaceChildren(...visibleProviders.map(createProviderCard));
-    requestAnimationFrame(fitTextBars);
+async function selectProviderView(viewId) {
+    const nextView = normalizeProviderView(viewId);
+    syncProviderView(nextView);
+
+    if (!window.pywebview?.api?.set_provider_view) {
+        return;
+    }
+
+    try {
+        const result = await pywebview.api.set_provider_view(nextView);
+        const syncedView = (typeof result === 'string' ? result : result?.provider_view) || nextView;
+        syncProviderView(syncedView);
+    } catch {
+        syncProviderView(nextView);
+    }
+}
+
+function createProviderIcon(providerId, fallbackText, className) {
+    const icon = document.createElement('span');
+    icon.className = className;
+    const asset = PROVIDER_ICON_ASSETS[providerId];
+    if (asset?.mode === 'mask') {
+        icon.classList.add('provider-icon-mask');
+        icon.style.setProperty('--provider-icon-url', `url("${asset.path}")`);
+    } else if (fallbackText) {
+        icon.textContent = fallbackText;
+    } else {
+        icon.classList.add('provider-icon-empty');
+    }
+    return icon;
+}
+
+function createProviderHeader(provider) {
+    const header = document.createElement('div');
+    header.className = 'provider-card-head';
+
+    const titleRow = document.createElement('div');
+    titleRow.className = 'provider-title-row';
+    const titleIcon = createProviderIcon(provider.id, provider.icon, 'provider-card-icon');
+    const title = document.createElement('h2');
+    title.textContent = provider.title;
+    titleRow.append(titleIcon, title);
+
+    const status = document.createElement('div');
+    status.className = 'provider-status';
+    status.dataset.providerStatus = provider.id;
+
+    header.append(titleRow, status);
+    return header;
+}
+
+function createProviderAccountRow(provider) {
+    const emailText = provider.profile?.email || '';
+    const planText = provider.profile?.plan || '';
+    if (!emailText && !planText) {
+        return null;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'provider-account-row';
+
+    const email = document.createElement('span');
+    email.className = 'provider-account-email';
+    email.textContent = emailText;
+
+    const plan = document.createElement('span');
+    plan.className = 'provider-account-plan';
+    plan.textContent = planText;
+
+    row.append(email, plan);
+    return row;
 }
 
 function createProviderCard(provider) {
@@ -155,39 +319,18 @@ function createProviderCard(provider) {
     card.className = `provider-card provider-${provider.id}`;
     card.dataset.provider = provider.id;
 
-    const header = document.createElement('div');
-    header.className = 'provider-card-head';
+    card.append(createProviderHeader(provider));
 
-    const titleWrap = document.createElement('div');
-    const titleRow = document.createElement('div');
-    titleRow.className = 'provider-title-row';
-    const titleIcon = createProviderIcon(provider.id, provider.icon, 'provider-card-icon');
-    const title = document.createElement('h2');
-    title.textContent = provider.title;
-    titleRow.append(titleIcon, title);
-    const status = document.createElement('div');
-    status.className = 'provider-status';
-    status.dataset.providerStatus = provider.id;
-    titleWrap.append(titleRow, status);
-
-    const plan = document.createElement('div');
-    plan.className = 'provider-plan';
-    plan.textContent = provider.profile?.plan || '';
-    header.append(titleWrap, plan);
-    card.append(header);
-
-    if (provider.profile?.email) {
-        const email = document.createElement('div');
-        email.className = 'provider-email';
-        email.textContent = provider.profile.email;
-        card.append(email);
+    const accountRow = createProviderAccountRow(provider);
+    if (accountRow) {
+        card.append(accountRow);
     }
 
     const usageRows = provider.usage || [];
     if (usageRows.length) {
         const usage = document.createElement('div');
         usage.className = 'usage-list';
-        usage.replaceChildren(...usageRows.map(createUsageRow));
+        usage.replaceChildren(...usageRows.map((row) => createUsageRow(row)));
         card.append(usage);
     }
 
@@ -215,9 +358,9 @@ function createProviderCard(provider) {
     return card;
 }
 
-function createUsageRow(entry) {
+function createUsageRow(entry, options = {}) {
     const row = document.createElement('div');
-    row.className = 'usage-row';
+    row.className = options.compact ? 'usage-row usage-row-compact' : 'usage-row';
 
     const label = document.createElement('div');
     label.className = 'usage-label';
@@ -316,38 +459,54 @@ function startStatusTimer() {
 }
 
 function tickStatusText() {
+    els.footerStatus.textContent = '';
+    els.footerStatus.classList.remove('error');
+
     for (const node of document.querySelectorAll('[data-provider-status]')) {
-        const providerId = node.dataset.providerStatus;
-        const status = statusStateByProvider[providerId];
-        if (!status) {
+        const provider = (lastData.providers || []).find((item) => item.id === node.dataset.providerStatus);
+        if (!provider) {
             node.textContent = '';
             node.classList.remove('error');
             continue;
         }
 
-        if (status.text !== undefined) {
-            node.textContent = status.text;
-            node.classList.toggle('error', Boolean(status.isError));
-            continue;
-        }
-
-        const now = Date.now() / 1000;
-        const secondsAgo = Math.max(0, Math.floor(now - status.lastSuccessTime));
-        const parts = [formatDuration(secondsAgo)];
-        if (status.refreshing) {
-            parts.push(translations.status_refreshing);
-        } else if (status.error) {
-            parts.push(status.error);
-        } else if (secondsAgo >= 60 && status.nextPollTime) {
-            const secondsUntil = Math.max(0, Math.floor(status.nextPollTime - now));
-            if (secondsUntil > 0) {
-                parts.push(translations.status_next_update.replace('{duration}', formatCountdown(secondsUntil)));
-            }
-        }
-
-        node.textContent = parts.join(' · ');
-        node.classList.toggle('error', Boolean(status.error));
+        const status = formatProviderStatus(provider);
+        node.textContent = status.text;
+        node.classList.toggle('error', status.isError);
     }
+}
+
+function formatProviderStatus(provider) {
+    const status = statusStateByProvider[provider.id];
+    if (!status) {
+        return { text: translations.status_refreshing || '', isError: false };
+    }
+
+    if (status.text !== undefined) {
+        return {
+            text: status.text,
+            isError: Boolean(status.isError),
+        };
+    }
+
+    const now = Date.now() / 1000;
+    const secondsAgo = Math.max(0, Math.floor(now - status.lastSuccessTime));
+    const parts = [formatDuration(secondsAgo)];
+    if (status.refreshing) {
+        parts.push(translations.status_refreshing);
+    } else if (status.error) {
+        parts.push(status.error);
+    } else if (secondsAgo >= 60 && status.nextPollTime) {
+        const secondsUntil = Math.max(0, Math.floor(status.nextPollTime - now));
+        if (secondsUntil > 0) {
+            parts.push(translations.status_next_update.replace('{duration}', formatCountdown(secondsUntil)));
+        }
+    }
+
+    return {
+        text: parts.filter(Boolean).join(' · '),
+        isError: Boolean(status.error),
+    };
 }
 
 function fitTextBars() {

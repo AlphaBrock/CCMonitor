@@ -13,9 +13,9 @@ CCMonitor is a native Windows tray app that shows Claude and Codex usage at a gl
 ## Features
 
 - **Portable** - single EXE (~9.8 MB), no installation, no Electron, no extra runtime required. Download, place anywhere, run. To uninstall, delete the file
-- **Zero configuration** - defaults to your existing Claude Code login for tray alerts and commands; if Codex is logged in locally, the detail window shows Codex usage too, and usage queries do not use API keys
+- **Zero configuration** - defaults to your existing Claude Code login for tray alerts and commands; if Codex is logged in locally, the desktop panel shows Codex usage too, and usage queries do not use API keys
 - **Live tray icon** with two [configurable](docs/configuration.md#tray-icon-bars) progress bars (session + weekly by default), [configurable tooltip](docs/configuration.md#tooltip-fields), percentage display, a right-click menu to choose which provider the tray shows (Auto shows Codex and Claude in the hover tooltip while icon bars use the primary provider), and theme-aware colors for light and dark taskbars
-- **Desktop detail window** - launches visible on startup, stays open until you hide it, supports left-drag repositioning, and can be pinned above other windows. The window provides All / Codex / Claude views with both providers' `5h` / `7d` quotas, local 30-day cost and token estimates, reset countdowns, and stale-data indicators
+- **Desktop panel** - launches visible on startup, stays open until you hide it, supports left-drag repositioning, and can be pinned above other windows. The default panel shows only the current provider selection's `5h` usage; the info button opens the full `5h` / `7d` quotas, local 30-day cost and token estimates, reset countdowns, and stale-data indicators
 - **Smart alerts** - configurable threshold notifications per quota type, with time-aware mode that only alerts when usage outpaces elapsed time. Reset notifications when a nearly exhausted quota refills
 - **[Event commands](docs/event-commands.md)** - run a custom shell command when a quota resets, a usage threshold is crossed, or the app starts up. Send push notifications to your phone, resume an AI agent, start a fresh 5-hour session automatically, play an alert sound, or trigger any custom workflow
 - **Automatic token refresh** - Claude mode runs `claude update` when the OAuth session expires; Codex mode refreshes the local ChatGPT OAuth token directly
@@ -43,7 +43,7 @@ This tool handles your Claude Code or Codex OAuth token, so you should be able t
 
 - **Windows 10 or Windows 11** (64-bit)
 - **Claude data**: [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in (CLI, VS Code extension, or JetBrains plugin - any variant works). The app reads the OAuth token that Claude Code stores locally (`~/.claude/.credentials.json`). If you have `CLAUDE_CONFIG_DIR` set, the app uses that directory instead.
-- **Codex data**: the app reads ChatGPT/Codex OAuth tokens from `%CODEX_HOME%\auth.json` or `~\.codex\auth.json`. `OPENAI_API_KEY` cannot query Codex usage. `usage_provider` chooses the primary provider for alerts, event commands, and Auto icon bars; `tray_provider` controls tray display separately.
+- **Codex data**: the app reads ChatGPT/Codex OAuth tokens from `%CODEX_HOME%\auth.json` or `~\.codex\auth.json`. `OPENAI_API_KEY` cannot query Codex usage. `usage_provider` chooses the primary provider for alerts, event commands, and Auto icon bars; `tray_provider` controls tray display and desktop panel provider filtering.
 
 > [!TIP]
 > Claude token expiry runs `claude update`; Codex tokens older than 8 days are refreshed directly through OAuth. If the token is missing entirely, the app shows a notification and a "!" icon - log in to the selected tool and the monitor picks it up automatically.
@@ -61,9 +61,9 @@ This tool handles your Claude Code or Codex OAuth token, so you should be able t
 | Action | What happens |
 |---|---|
 | **Hover** over the tray icon | Tooltip shows 5h and 7d usage percentages with reset times |
-| **App start** | The desktop detail window opens immediately near the tray |
-| **Left-click** the tray icon | Shows the desktop detail window and brings it to the front |
-| **All / Codex / Claude** | Switches between combined and provider-specific detail views |
+| **App start** | The desktop panel opens immediately near the tray with a single `5h` usage card |
+| **Left-click** the tray icon | Shows the desktop panel and brings it to the front |
+| **Info button** | Switches between the main-panel `5h` summary and the full detail dashboard; provider icons in Details sync with the tray Provider setting |
 | **Right-click** the tray icon | Context menu: show window, provider display selector, autostart toggle, test event commands, restart, GitHub link, or quit |
 | **PIN** button | Keeps the desktop window always on top |
 | **X** button or **Escape** | Hides the desktop window to the tray |

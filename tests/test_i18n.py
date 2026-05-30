@@ -279,6 +279,16 @@ class TestLocaleConsistency(unittest.TestCase):
                 if isinstance(value, str):
                     self.assertNotEqual(value, '', f'{lang}.json key "{key}" is empty')
 
+    def test_popup_view_labels_are_localized(self):
+        """New popup view labels should not silently fall back to English."""
+        localized_keys = ['dashboard_title', 'view_brief', 'view_details', 'session_unavailable', 'loading', 'error_label']
+
+        for lang, data in self.translations.items():
+            if lang == 'en':
+                continue
+            for key in localized_keys:
+                self.assertNotEqual(data[key], self.reference[key], f'{lang}.json key "{key}" still uses the English text')
+
     def test_value_types_match_english(self):
         """Value types (str, list) must match en.json for each key."""
         for lang, data in self.translations.items():

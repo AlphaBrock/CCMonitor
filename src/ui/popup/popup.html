@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<link rel="stylesheet" href="popup.css?v=20260529d">
+<link rel="stylesheet" href="popup.css?v=20260530c">
 </head>
 <body>
 <header id="windowHeader" class="window-header pywebview-drag-region">
@@ -19,6 +19,12 @@
                 <path d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l5.905 5.905L4.81 10.33a1.25 1.25 0 0 0-.476 2.065L7.439 15.5L3 19.94V21h1.06l4.44-4.44l3.105 3.105a1.25 1.25 0 0 0 2.065-.476l1.145-3.313l5.905 5.904a.75.75 0 0 0 1.06-1.06L3.28 2.22zm17.074 9.942l-3.34 1.67l-6.846-6.846l1.67-3.34a2.75 2.75 0 0 1 4.405-.714l4.825 4.826a2.75 2.75 0 0 1-.714 4.404z"/>
             </svg>
         </button>
+        <button type="button" id="detailsBtn" class="action-btn icon-btn details-btn" aria-label="Show details">
+            <svg class="details-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M12 10.75v5.35M12 7.75h.01" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+            </svg>
+        </button>
         <button type="button" id="closeBtn" class="action-btn icon-btn close-btn" aria-label="Hide window">
             <svg class="close-icon" viewBox="5 5 14 14" aria-hidden="true">
                 <path d="M6.75 6.75L17.25 17.25M17.25 6.75L6.75 17.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -27,15 +33,14 @@
     </div>
 </header>
 
-<nav id="providerSwitcher" class="provider-switcher" aria-label="Provider view"></nav>
-
 <main id="providerCards" class="provider-cards">
 </main>
 
 <footer id="appFooter" class="app-footer">
+    <span id="footerStatus" class="footer-status"></span>
     <span id="appVersion"></span>
 </footer>
 
-<script src="popup.js?v=20260529d"></script>
+<script src="popup.js?v=20260530c"></script>
 </body>
 </html>

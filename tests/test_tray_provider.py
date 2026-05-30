@@ -139,6 +139,50 @@ class TestProviderMenuHandler(unittest.TestCase):
         mock_save.assert_called_once_with('codex')
         app._render_tray.assert_called_once()
 
+    def test_set_tray_provider_syncs_open_popup(self):
+        app = _make_render_app()
+        app._tray_provider = 'auto'
+        app._render_tray = MagicMock()
+        app.popup = MagicMock()
+
+        with patch('src.runtime.app.save_tray_provider') as mock_save:
+            result = app.set_tray_provider('claude')
+
+        self.assertEqual(result, 'claude')
+        self.assertEqual(app.provider_view, 'claude')
+        mock_save.assert_called_once_with('claude')
+        app._render_tray.assert_called_once()
+        app.popup.sync_provider_view.assert_called_once()
+
+    def test_set_provider_view_maps_all_to_auto(self):
+        app = _make_render_app()
+        app._tray_provider = 'codex'
+        app._render_tray = MagicMock()
+        app.popup = None
+
+        with patch('src.runtime.app.save_tray_provider') as mock_save:
+            result = app.set_tray_provider_from_view('all')
+
+        self.assertEqual(result, 'all')
+        self.assertEqual(app._tray_provider, 'auto')
+        mock_save.assert_called_once_with('auto')
+        app._render_tray.assert_called_once()
+
+    def test_invalid_provider_view_does_not_persist(self):
+        app = _make_render_app()
+        app._tray_provider = 'claude'
+        app._render_tray = MagicMock()
+        app.popup = MagicMock()
+
+        with patch('src.runtime.app.save_tray_provider') as mock_save:
+            result = app.set_tray_provider_from_view('bad')
+
+        self.assertEqual(result, 'claude')
+        self.assertEqual(app._tray_provider, 'claude')
+        mock_save.assert_not_called()
+        app._render_tray.assert_not_called()
+        app.popup.sync_provider_view.assert_not_called()
+
 
 class TestIconResponseSelection(unittest.TestCase):
 
